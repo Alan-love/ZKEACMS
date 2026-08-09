@@ -186,12 +186,6 @@
     ]
   },
   {
-    "outputFileName": "wwwroot/lib/codemirror/addon/format/autoformat.min.js",
-    "inputFiles": [
-      "wwwroot/lib/codemirror/addon/format/autoformat.js"
-    ]
-  },
-  {
     "outputFileName": "wwwroot/js/captcha.min.js",
     "inputFiles": [
       "wwwroot/js/captcha.js"
@@ -207,6 +201,30 @@
     "outputFileName": "wwwroot/js/list-editor.min.js",
     "inputFiles": [
       "wwwroot/js/list-editor.js"
+    ]
+  },
+  {
+    "outputFileName": "wwwroot/js/tinymce/plugins/docx2html/plugin.min.js",
+    "inputFiles": [
+      "wwwroot/js/tinymce/plugins/docx2html/plugin.js"
+    ]
+  },
+  {
+    "outputFileName": "wwwroot/lib/monaco/code-editor.min.js",
+    "inputFiles": [
+      "wwwroot/lib/monaco/code-editor.js"
+    ]
+  },
+  {
+    "outputFileName": "wwwroot/js/dropdown-tree.min.js",
+    "inputFiles": [
+      "wwwroot/js/dropdown-tree.js"
+    ]
+  },
+  {
+    "outputFileName": "wwwroot/css/dropdown-tree.min.css",
+    "inputFiles": [
+      "wwwroot/css/dropdown-tree.css"
     ]
   }
 ]

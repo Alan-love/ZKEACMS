@@ -28,6 +28,8 @@
             {
                 foreach (var widgetPart in Model.ZoneWidgets[zoneId].OrderBy(m => m.Widget.Position).ThenBy(m => m.Widget.WidgetName))
                 {
+                    if (widgetPart.Widget.Status == (int)WidgetStatus.Deleted) continue;
+
                     if (widgetPart.Widget.ID.IsNotNullAndWhiteSpace())
                     {
                         @await Html.DesignWidget(new DesignWidgetViewModel(widgetPart, Model.Page.ID))
@@ -44,7 +46,7 @@
                 <div class="zoneName">
                     <a title="@L("Add Content")"
                        class="zk-btn zk-btn-sm add-widget"
-                       href="@Url.Action("SelectWidget", "WidgetTemplate", new {pageId = Model.Page.ID, ZoneId = zoneId})">
+                       href="@Url.Action("SelectWidget", "WidgetTemplate", new QueryContext {PageId = Model.Page.ID, ZoneId = zoneId})">
                         <i class="glyphicon glyphicon-plus"></i>
                         @L("Add Content") | @Model.Zones.First(m => m.HeadingCode == zoneId).ZoneName
 
@@ -52,7 +54,7 @@
                     @if (ViewBag.CanPasteWidget == true)
                     {
                         <a class="paste-widget zk-btn zk-btn-danger zk-btn-sm" title="@L("Paste copy content to the area")"
-                           href="@Url.Action("Paste", "Widget", new { PageID = Model.Page.ID, ZoneID = zoneId })">
+                           href="@Url.Action("Paste", "Widget", new { PageId = Model.Page.ID, ZoneId = zoneId })">
                             <i class="glyphicon glyphicon-paste"></i>
                             @L("Paste")
                         </a>

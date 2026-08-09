@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using ZKEACMS.Route;
 
 namespace ZKEACMS
 {
@@ -45,6 +46,13 @@ namespace ZKEACMS
              },
              new RouteDescriptor
              {
+                RouteName = "AntiforgeryRequest",
+                Template = "js/antiforgery/getrequesttoken",
+                Defaults = new { controller = "Antiforgery",action="GetRequestToken" },
+                Priority = 11
+             },
+             new RouteDescriptor
+             {
                 RouteName = "error",
                 Template = "error/{action}/{code?}",
                 Defaults = new { controller = "error", action = "index" },
@@ -55,6 +63,7 @@ namespace ZKEACMS
                 RouteName = "AccountAdmin",
                 Template = "account/{action}",
                 Defaults = new { controller = "account", action = "index"},
+                Constraints = new { action = new AccountRouteConstraint() },
                 Priority = 11
              }
         };

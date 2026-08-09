@@ -22,6 +22,7 @@ namespace ZKEACMS.Product.Models
         public string SEOTitle { get; set; }
         public string SEOKeyWord { get; set; }
         public string SEODescription { get; set; }
+        public int? DisplayOrder { get; set; }
     }
     class ProductCategoryMetaData : ViewMetaData<ProductCategory>
     {
@@ -29,8 +30,9 @@ namespace ZKEACMS.Product.Models
         {
             ViewConfig(m => m.ID).AsHidden();
             ViewConfig(m => m.ParentID).AsHidden();
+            ViewConfig(m => m.DisplayOrder).AsHidden();
             ViewConfig(m => m.Title).AsTextBox().Order(1).MaxLength(200).Required();
-            ViewConfig(m => m.Url).AsTextBox().Order(2).MaxLength(100).UrlPart();
+            ViewConfig(m => m.Url).AsTextBox().Order(2).MaxLength(100).UrlPart().RandomText().Required();
             ViewConfig(m => m.Status).AsDropDownList().DataSource(DicKeys.RecordStatus, SourceType.Dictionary);
             ViewConfig(m => m.SEOTitle).AsTextBox().Order(4).MaxLength(100);
             ViewConfig(m => m.SEOKeyWord).AsTextBox().Order(5).MaxLength(100);

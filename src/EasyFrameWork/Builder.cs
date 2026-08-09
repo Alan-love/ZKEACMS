@@ -19,26 +19,20 @@ using Easy.Mvc.StateProviders;
 using Easy.Mvc.ValueProvider;
 using Easy.Net;
 using Easy.Notification;
+using Easy.Notification.Queue;
 using Easy.Options;
 using Easy.RepositoryPattern;
 using Easy.RuleEngine;
 using Easy.RuleEngine.RuleProviders;
 using Easy.RuleEngine.Scripting;
-using Easy.Notification.Queue;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc.Abstractions;
-using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.Mvc.Razor;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text.Encodings.Web;
 using System.Text.Unicode;
@@ -81,13 +75,13 @@ namespace Easy
             services.AddTransient<IRuleProvider, DateRuleProvider>();
             services.AddTransient<IRuleProvider, MoneyRuleProvider>();
             services.AddTransient<IScriptExpressionEvaluator, ScriptExpressionEvaluator>();
-            services.AddTransient<IWebClient, WebClient>();
+            services.AddTransient<IWebClient, WebClient>().AddHttpClient();
 
-            services.AddSingleton<ICacheProvider, DefaultCacheProvider>();
             services.AddScoped<ILocalize, Localize>();
 
-            services.ConfigureCache<ScriptExpressionResult>();
-            services.ConfigureCache<ConcurrentDictionary<string, ConcurrentDictionary<string, LanguageEntity>>>();
+            services.AddMemoryCache();
+            services.AddTransient(typeof(ICacheManager<>), typeof(CacheManager<>));
+            services.AddSingleton<ISignals, Signals>();
 
             services.AddScoped<IAuthorizationHandler, RolePolicyRequirementHandler>();
             services.AddSingleton(HtmlEncoder.Create(UnicodeRanges.All));
@@ -103,6 +97,7 @@ namespace Easy
             services.ConfigureMetaData<RoleEntity, RoleMetaData>();
             services.ConfigureMetaData<UserRoleRelation, UserRoleRelationMetaData>();
             services.ConfigureMetaData<SmtpSetting, SmtpSettingMetaData>();
+            services.ConfigureMetaData<AuditTrail.AuditTrailRecord, AuditTrail.AuditTrailRecordMetaData>();
 
 
             services.Configure<CDNOption>(configuration.GetSection("CDN"));
@@ -133,10 +128,6 @@ namespace Easy
         {
             builder.UseMiddleware<PluginStaticFileMiddleware>();
             return builder;
-        }
-        public static void UseFileLog(this ILoggerFactory loggerFactory, IWebHostEnvironment env, IHttpContextAccessor httpContextAccessor)
-        {
-            loggerFactory.AddProvider(new FileLoggerProvider(env, httpContextAccessor));
         }
     }
 }

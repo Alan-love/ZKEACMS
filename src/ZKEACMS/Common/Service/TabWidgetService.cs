@@ -11,7 +11,6 @@ using ZKEACMS.Widget;
 using ZKEACMS.Page;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Easy.RepositoryPattern;
 using ZKEACMS.Extend;
 
 namespace ZKEACMS.Common.Service
@@ -23,15 +22,34 @@ namespace ZKEACMS.Common.Service
         {
         }
 
-        public override ServiceResult<TabWidget> Add(TabWidget item)
+        public override ErrorOr<TabWidget> Add(TabWidget item)
         {
             item.TabItems = item.TabItems.RemoveDeletedItems().ToList();
+            int id = 0;
+            item.TabItems.ForEach(t => t.ID = ++id);
             return base.Add(item);
         }
-        public override ServiceResult<TabWidget> Update(TabWidget item)
+        public override ErrorOr<TabWidget> Update(TabWidget item)
         {
             item.TabItems = item.TabItems.RemoveDeletedItems().ToList();
+            int id = 0;
+            if (item.TabItems.Any())
+            {
+                id = item.TabItems.Max(o => o.ID) ?? 0;
+            }
+            item.TabItems.ForEach(m =>
+            {
+                if (m.ID == null)
+                {
+                    m.ID = ++id;
+                }
+            });
             return base.Update(item);
+        }
+
+        protected override IEnumerable<string> GetFilesInWidget(TabWidget widget)
+        {
+            return base.GetFilesInWidget(widget);
         }
     }
 }

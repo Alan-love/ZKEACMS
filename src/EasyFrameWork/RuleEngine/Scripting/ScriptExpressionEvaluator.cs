@@ -13,15 +13,15 @@ namespace Easy.RuleEngine.Scripting
 {
     public class ScriptExpressionEvaluator : IScriptExpressionEvaluator
     {
-        private readonly ICacheManager<ScriptExpressionResult> _cacheManager;
-        public ScriptExpressionEvaluator(ICacheManager<ScriptExpressionResult> cacheManager)
+        private readonly ICacheManager<ScriptExpressionEvaluator> _cacheManager;
+        public ScriptExpressionEvaluator(ICacheManager<ScriptExpressionEvaluator> cacheManager)
         {
             _cacheManager = cacheManager;
         }
 
         public object Evaluate(string expression, IEnumerable<IGlobalMethodProvider> providers)
         {
-            var expr = _cacheManager.GetOrAdd(expression, ctx =>
+            var expr = _cacheManager.GetOrCreate(expression, factory =>
             {
                 var ast = ParseExpression(expression);
                 return new ScriptExpressionResult { Tree = ast, Errors = ast.GetErrors().ToList() };
@@ -42,12 +42,12 @@ namespace Easy.RuleEngine.Scripting
             return result.Value;
         }
 
-        private AbstractSyntaxTree ParseExpression(string expression)
+        private static AbstractSyntaxTree ParseExpression(string expression)
         {
             return new Parser(expression).Parse();
         }
 
-        private EvaluationResult EvaluateExpression(AbstractSyntaxTree tree, IEnumerable<IGlobalMethodProvider> providers)
+        private static EvaluationResult EvaluateExpression(AbstractSyntaxTree tree, IEnumerable<IGlobalMethodProvider> providers)
         {
             var context = new EvaluationContext
             {
@@ -57,7 +57,7 @@ namespace Easy.RuleEngine.Scripting
             return new Interpreter().Evalutate(context);
         }
 
-        private object Evaluate(IEnumerable<IGlobalMethodProvider> globalMethodProviders, string name, IEnumerable<object> args)
+        private static object Evaluate(IEnumerable<IGlobalMethodProvider> globalMethodProviders, string name, IEnumerable<object> args)
         {
             var globalMethodContext = new GlobalMethodContext
             {

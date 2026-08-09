@@ -12,17 +12,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - name: Setup .NET Core
-      uses: actions/setup-dotnet@v1
+      uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '5.0.x'
+        dotnet-version: '9.0.x'
     - name: Install dependencies
       run: dotnet restore
-    - name: Build
-      run: dotnet build --configuration Release --no-restore
-    - name: Test EasyFrameWork
-      working-directory: ./test/EasyFrameWork.Test
+    - name: Run tests
       run: dotnet test
     - name: Install tools
       run: |
@@ -36,13 +33,3 @@ jobs:
         mkdir ./src/ZKEACMS.WebHost/bin/Release/PublishOutput/App_Data
         sqlite-exec -d ./src/ZKEACMS.WebHost/bin/Release/PublishOutput/App_Data/Database.sqlite -f ./Database/SQLite/ZKEACMS.sqlite.sql
         cp -f ./Database/SQLite/appsettings.json ./src/ZKEACMS.WebHost/bin/Release/PublishOutput/appsettings.json
-    - name: Archive cms application
-      uses: actions/upload-artifact@v2
-      with:
-        name: Application
-        path: ./src/ZKEACMS.WebHost/bin/Release/PublishOutput
-    - name: Archive cms database
-      uses: actions/upload-artifact@v2
-      with:
-        name: Database
-        path: ./Database

@@ -8,6 +8,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Mvc;
 using Easy.Extend;
 using System;
+using System.Net;
+using ZKEACMS.Route;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace ZKEACMS.Filter
 {
@@ -16,22 +20,25 @@ namespace ZKEACMS.Filter
     /// </summary>
     public class RenderRefererPageAttribute : WidgetAttribute
     {
-        private string GetPagePath(ActionExecutedContext filterContext)
+        private string GetPagePath(FilterContext filterContext)
         {
-            string pagePath = filterContext.HttpContext.Request.Form["CurrentPagePath"];
-            if (pagePath.IsNullOrWhiteSpace()) throw new Exception("Cannot find 'CurrentPagePath', please include @Html.HiddenForCurrentPagePath() in your form.");
-
-            return pagePath;
+            return filterContext.HttpContext.Request.Form["CurrentPagePath"];
         }
-        public override PageEntity GetPage(ActionExecutedContext filterContext)
+
+        public override void OnActionExecuting(ActionExecutingContext filterContext)
         {
             string pagePath = GetPagePath(filterContext);
-            using (var pageService = filterContext.HttpContext.RequestServices.GetService<IPageService>())
+            if (pagePath.IsNullOrWhiteSpace())
             {
-                return pageService.GetByPath(pagePath, false);
+#if DEBUG
+                throw new Exception("'CurrentPagePath' is empty, please include @Html.HiddenForCurrentPagePath() in your form.");
+#else
+                filterContext.Result = new BadRequestResult();
+                return;
+#endif
             }
+            base.OnActionExecuting(filterContext);
         }
-
         public override void OnActionExecuted(ActionExecutedContext filterContext)
         {
             if (filterContext.Result is ViewResult viewResult)
@@ -55,10 +62,16 @@ namespace ZKEACMS.Filter
 
         private void RenderRefererPage(ActionExecutedContext filterContext, ViewResult viewResult)
         {
-            base.OnActionExecuted(filterContext);
+            var routeDataProviders = filterContext.HttpContext.RequestServices.GetServices<IRouteDataProvider>();
+            string pagePath = GetPagePath(filterContext);
+            foreach (var routeDataProvider in routeDataProviders.OrderBy(m => m.Order))
+            {
+                pagePath = routeDataProvider.ExtractVirtualPath(pagePath, filterContext.RouteData.Values);
+            }
             filterContext.RouteData.Values["controller"] = "page";
-            filterContext.RouteData.Values["path"] = GetPagePath(filterContext);
+            filterContext.RouteData.Values["path"] = pagePath;
             viewResult.ViewName = "PreView";
+            base.OnActionExecuted(filterContext);
         }
     }
 

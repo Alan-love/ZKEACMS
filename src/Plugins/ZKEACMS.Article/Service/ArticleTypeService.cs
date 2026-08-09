@@ -1,0 +1,95 @@
+/* http://www.zkea.net/ 
+ * Copyright (c) ZKEASOFT. All rights reserved. 
+ * http://www.zkea.net/licenses */
+
+using Easy.Extend;
+using Easy.RepositoryPattern;
+using System.Collections.Generic;
+using ZKEACMS.Article.Models;
+using Easy;
+using Microsoft.EntityFrameworkCore;
+using System;
+using System.Linq;
+using ZKEACMS.Common.Models;
+using Easy.AuditTrail;
+
+namespace ZKEACMS.Article.Service
+{
+    public class ArticleTypeService : ServiceBase<ArticleType, CMSDbContext>, IArticleTypeService
+    {
+        private readonly IArticleService _articleService;
+        private readonly ILocalize _localize;
+        private readonly IAuditTrailService _auditTrailService;
+        public ArticleTypeService(IApplicationContext applicationContext, 
+            IArticleService articleService, 
+            ILocalize localize, 
+            CMSDbContext dbContext, 
+            IAuditTrailService auditTrailService)
+            : base(applicationContext, dbContext)
+        {
+            _articleService = articleService;
+            _localize = localize;
+            _auditTrailService = auditTrailService;
+        }
+
+        public override ErrorOr<ArticleType> Add(ArticleType item)
+        {
+            item.ParentID = item.ParentID ?? 0;
+            if (item.Url.IsNotNullAndWhiteSpace() && GetByUrl(item.Url) != null)
+            {
+                return new Error("Url", _localize.Get("URL already exists"));
+            }
+            return base.Add(item);
+        }
+        public override ErrorOr<ArticleType> Update(ArticleType item)
+        {
+            if (item.Url.IsNotNullAndWhiteSpace() && Count(m => m.Url == item.Url && m.ID != item.ID) > 0)
+            {
+                return new Error("Url", _localize.Get("URL already exists"));
+            }
+            var oldItem = Get(item.ID);
+            var result = base.Update(item);
+            if (result.IsSuccess)
+            {
+                _auditTrailService.AuditUpdate(oldItem, item);
+            }
+            return result;
+        }
+        public ArticleType GetByUrl(string url)
+        {
+            return Get(m => m.Url == url).FirstOrDefault();
+        }
+
+        public IEnumerable<ArticleType> GetChildren(long id)
+        {
+            return Get(m => m.ParentID == id);
+        }
+        public override void Remove(ArticleType item)
+        {
+            if (item != null)
+            {
+                _articleService.Remove(n => n.ArticleTypeID == item.ID);
+                GetChildren(item.ID).Each(m =>
+                {
+                    Remove(m);
+                });
+            }
+            base.Remove(item);
+        }
+
+        public void Move(int id, int parentId, int position)
+        {
+            var articleType = Get(id);
+            articleType.ParentID = parentId;
+
+            var siblings = Get().Where(m => m.ParentID == articleType.ParentID && m.ID != articleType.ID).OrderBy(m => m.DisplayOrder ?? m.ID).ToList();
+            siblings.Insert(position, articleType);
+
+            for (int i = 0; i < siblings.Count; i++)
+            {
+                siblings[i].DisplayOrder = i + 1;
+            }
+            UpdateRange(siblings.ToArray());
+        }
+    }
+}

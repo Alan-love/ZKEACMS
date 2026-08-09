@@ -2,6 +2,8 @@
  * Copyright (c) ZKEASOFT. All rights reserved. 
  * http://www.zkea.net/licenses */
 
+@import "./material-symbols.css";
+
 body {
     background: url(../images/dotted.png);
 }
@@ -322,25 +324,27 @@ a.badge:hover {
         background-color: white;
     }
 
+        .fullRowList li.muted {
+            border-left: 5px solid #ddd;
+        }
+
         .fullRowList li.sorting {
             height: 34px;
             border: 1px solid #ededed;
             border-left: 5px solid #E28271;
         }
 
-    .fullRowList.widgets li {
-        cursor: move;
-    }
-
     .fullRowList li ul {
         list-style: none;
         padding-left: 2.2rem;
     }
 
-    .fullRowList li:hover,
-    .fullRowList li.actived {
+    .fullRowList li:hover {
         border-left: 5px solid #E28271;
-        color: #E28271;
+    }
+
+    .fullRowList li.actived {
+        border-color: #E28271;
     }
 
     .fullRowList.droping {
@@ -349,6 +353,10 @@ a.badge:hover {
 
     .fullRowList .glyphicon {
         font-size: 12px;
+    }
+
+    .fullRowList .icon {
+        width: 16px;
     }
 
     .fullRowList.tags input {
@@ -373,19 +381,31 @@ a.badge:hover {
         }
 
     .fullRowList.ui-sortable li {
-        cursor: move;
+        cursor: grab;
     }
+
+        .fullRowList.ui-sortable li:active {
+            border-color: #E28271;
+            cursor: grabbing;
+        }
 
     .fullRowList a {
         text-decoration: none;
         outline: none;
+        display: inline-block;
+        margin: 0 2px;
     }
 
-    .fullRowList li:hover a,
-    .fullRowList li.actived a {
-        color: #E28271;
+    .fullRowList li.disabled {
+        border-left: 5px solid #ddd;
+        color: #ccc;
     }
 
+        .fullRowList li.disabled .icon {
+            opacity: 0.2;
+        }
+
+#rules.fullRowList .rule-item,
 #layouts.fullRowList li {
     cursor: pointer;
 }
@@ -524,8 +544,12 @@ a.badge:hover {
 }
 
 .sort-handle {
-    cursor: n-resize;
+    cursor: grab;
 }
+
+    .sort-handle:active {
+        cursor: grabbing;
+    }
 
 .panel-default > .panel-heading {
     background-image: -webkit-linear-gradient(top, #f5f5f5 0%, #f5f5f5 100%);
@@ -536,7 +560,7 @@ a.badge:hover {
     filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#fff5f5f5', endColorstr='#fff5f5f5', GradientType=0);
 }
 
-.form-group select#ZoneID,
+.form-group select#ZoneId,
 .form-group select.select {
     cursor: pointer;
 }
@@ -545,6 +569,11 @@ a.badge:hover {
     -webkit-box-shadow: none;
     -moz-box-shadow: none;
     box-shadow: none;
+}
+
+.form-group .tox-tinymce {
+    border: 1px solid #ccc;
+    border-radius: 4px;
 }
 
 #media-list .edit {
@@ -567,6 +596,10 @@ a.badge:hover {
     text-align: center;
 }
 
+    #media-list .thumbnail > a.img-link.confirm img {
+        background: url(../images/opacity-dotted.png);
+    }
+
     #media-list .thumbnail > a.img-link img {
         max-height: 100%;
         vertical-align: middle;
@@ -584,7 +617,7 @@ a.badge:hover {
 
 #media-list .thumbnail.status-2 .caption:after {
     display: block;
-    content: "文件不完整";
+    content: "Error";
     color: #fff;
     position: absolute;
     left: 0;
@@ -597,6 +630,12 @@ a.badge:hover {
 
 #media-list .thumbnail .caption .edit {
     text-align: center;
+    height: 20px;
+    padding: 0;
+    line-height: 20px;
+    border: 1px solid #ddd;
+    outline: none;
+    border-radius: 3px;
 }
 
 #media-list .thumbnail .close {
@@ -741,11 +780,6 @@ a.pack-theme {
     }
 }
 
-.CodeMirror {
-    width: 100%;
-    height: 100%;
-}
-
 .seach-terms .form-group {
     margin-right: 15px;
     margin-bottom: 10px;
@@ -756,15 +790,15 @@ a.pack-theme {
         display: block;
         float: left;
     }
-}
 
-.seach-terms .form-control {
-    max-width: 160px;
-}
-
-    .seach-terms .form-control.required {
-        background-color: #fff;
+    .seach-terms .form-control {
+        max-width: 160px;
     }
+}
+
+.seach-terms .form-control.required {
+    background-color: #fff;
+}
 
 .dataTable tfoot .search {
     display: none;
@@ -772,4 +806,8 @@ a.pack-theme {
 
 .select2-container--default .select2-selection--single {
     border-color: #ccc;
+}
+
+.opacity-dotted {
+    background: url(../images/opacity-dotted.png);
 }

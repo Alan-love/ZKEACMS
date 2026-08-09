@@ -30,6 +30,7 @@ namespace Easy.Mvc
         {
             _stateResolvers = new ConcurrentDictionary<string, Func<object>>();
             HttpContextAccessor = httpContextAccessor;
+            ServiceProvider = httpContextAccessor.HttpContext.RequestServices;
         }
         public IHttpContextAccessor HttpContextAccessor
         {
@@ -53,6 +54,7 @@ namespace Easy.Mvc
         {
             get { return Get<IWebHostEnvironment>(nameof(HostingEnvironment)); }
         }
+        public IServiceProvider ServiceProvider { get; }
         public bool IsAuthenticated
         {
             get { return HttpContextAccessor.HttpContext.User.Identity.IsAuthenticated; }
@@ -63,6 +65,8 @@ namespace Easy.Mvc
         }
         Func<object> FindResolverForState<T>(string name)
         {
+            if (HttpContextAccessor.HttpContext == null) return null;
+
             IApplicationContextStateProvider matchedProvider = null;
             if (!ContextStateProviders.ContainsKey(name))
             {
@@ -95,7 +99,7 @@ namespace Easy.Mvc
         }
         public T Get<T>(string name)
         {
-            var provider = _stateResolvers.GetOrAdd(name, key => FindResolverForState<T>(key));
+            var provider = _stateResolvers.GetOrAdd(name, FindResolverForState<T>);
             if (provider != null)
             {
                 return (T)provider();

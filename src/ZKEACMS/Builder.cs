@@ -28,7 +28,6 @@ namespace ZKEACMS
 
             services.AddRouteDataProvider();
             services.ConfigCMS(configuration);
-            services.ConfigCache();
             services.ConfigMetaData();
             services.ConfigEvents();
             services.ConfigCaptcha();
@@ -36,16 +35,14 @@ namespace ZKEACMS
             services.UseEasyFrameWork(configuration);
             services.ConfigPlugin(webHostEnvironment, mvcBuilder);
             services.ConfigAuthentication();
+            services.ConfigAuditTrial();
         }
 
-        public static void UseZKEACMS(this IApplicationBuilder applicationBuilder, IWebHostEnvironment hostingEnvironment, IHttpContextAccessor httpContextAccessor)
+        public static void UseZKEACMS(this IApplicationBuilder applicationBuilder, IWebHostEnvironment hostingEnvironment, IServiceProvider serviceProvider)
         {
-            if (hostingEnvironment.IsDevelopment())
-            {
-                applicationBuilder.UsePluginStaticFile();
-            }
+            applicationBuilder.UsePluginStaticFile();
             applicationBuilder.UseStaticFiles();
-            ServiceLocator.Setup(httpContextAccessor);
+            ServiceLocator.Setup(serviceProvider);
             applicationBuilder.ConfigureResource();
             applicationBuilder.ConfigurePlugin(hostingEnvironment);
             applicationBuilder.UseSession();
@@ -70,9 +67,9 @@ namespace ZKEACMS
             });
             using (var scope = applicationBuilder.ApplicationServices.CreateScope())
             {
-                foreach (IStartTask task in scope.ServiceProvider.GetServices<IStartTask>())
+                foreach (IAppStartTask task in scope.ServiceProvider.GetServices<IAppStartTask>())
                 {
-                    task.Excute();
+                    task.OnStartup();
                 }
             }
 

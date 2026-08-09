@@ -15,6 +15,7 @@ using Microsoft.EntityFrameworkCore;
 using System;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
+using System.Collections.Generic;
 
 namespace ZKEACMS.Common.Service
 {
@@ -36,7 +37,7 @@ namespace ZKEACMS.Common.Service
 
             string path = null;
             IUrlHelper urlHelper = null;
-            if (ApplicationContext.As<CMSApplicationContext>().IsDesignMode)
+            if (ApplicationContext.Current().IsDesignMode)
             {
                 var layout = widgetDisplayContext.PageLayout;
                 if (layout != null && layout.Page != null)
@@ -87,6 +88,11 @@ namespace ZKEACMS.Common.Service
                 currentWidget.RootID = "#";
             }
             return new NavigationWidgetViewModel(navs, currentWidget);
+        }
+
+        protected override IEnumerable<string> GetFilesInWidget(NavigationWidget widget)
+        {
+            yield return widget.Logo;
         }
     }
 }

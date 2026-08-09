@@ -10,8 +10,13 @@ namespace ZKEACMS.Event
 {
     public class Events
     {
+        public const string All = "*";
         #region
         public const string OnDatabaseCreated = "ZKEACMS.Events.OnDatabaseCreated";
+        #endregion
+
+        #region Account
+        public const string OnResetPassword = "ZKEACMS.Events.OnResetPassword";
         #endregion
 
         #region Page

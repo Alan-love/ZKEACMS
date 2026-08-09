@@ -1,7 +1,7 @@
 @using ZKEACMS.Common
 @using Easy.ViewPort.jsTree
 @{
-    string pageId = ViewContext.HttpContext.Request.Query["PageID"];
+    string pageId = ViewContext.HttpContext.Request.Query["PageId"];
     Script.Reqiured("jQueryUi").AtFoot();
     Script.Reqiured("jsTree").AtFoot();
     Style.Reqiured("jsTree").AtHead();
@@ -95,7 +95,7 @@
                 <hr />
                 <p>
                     <strong>@L("Notice:")</strong>
-                    @L("The page must be published before it can be accessed via the URL. Modifying the page does not affect the released version until the next release.")
+                    @L("The page must be published that can be accessed via the URL")
                 </p>
             </div>
             <div class="modal-footer">
@@ -107,7 +107,7 @@
 </div><!-- /.modal -->
 @using (Script.AtFoot())
 {
-<script type="text/javascript">
+    <script type="text/javascript">
         function Create(node) {
             var parent = node.reference.attr("id");
             window.location.href = '@Url.Action("Create", "Page")' + '?ParentID=' + parent;
@@ -139,9 +139,10 @@
                 Easy.Block();
                 $.post('@Url.Action("Publish")', { id: id }, function (data) {
                     if (data.errorMessage) {
-                        Easy.ShowMessageBox("@L("Notice")",data.errorMessage);
+                        Easy.ShowMessageBox("@L("Notice")", data.errorMessage);
                     }
                     $(".jstree").jstree().refresh();
+                    $(".simplePreview .widget.disabled").remove();
                     Easy.UnBlock();
                 });
             }, true);
@@ -150,7 +151,7 @@
             location.hash = selected.node.id;
             var pageZones = $("#pageZones");
             pageZones.empty();
-            $.post("@Url.Action("PageZones", "Page")", { PageID: selected.node.id }, function (html) {
+            $.post("@Url.Action("PageZones", "Page")", { PageId: selected.node.id }, function (html) {
                 pageZones.html(html);
             }, "html");
         }
@@ -172,24 +173,28 @@
         $(document).on("click", ".fullRowList .delete", function () {
             var id = $(this).data("widgetid");
             Easy.ShowMessageBox("@L("Notice")", "@L("Do you want to delete?")", function () {
-                $.post("@Url.Action("DeleteWidget", "Widget")", { ID: id }, function (data) {
-                    if (data) {
+                $.post("@Url.Action("DeleteWidget", "Widget")", { ID: id, permanent: true }, function (data) {
+                    if (data.actionType == @((int)ActionType.Delete)) {
                         $("#widget_" + id).remove();
+                    } else if (data.actionType == @((int)ActionType.Update)) {
+                        $("#widget_" + id).addClass("disabled");
                     }
                 }, "json");
             }, true, 10);
-        }).on("click", ".publish-page",function() {
+        }).on("click", ".publish-page", function () {
             var btn = $(this);
             Publish({
                 reference: {
                     attr: function (id) {
-                return btn.data(id);
-            }}});
+                        return btn.data(id);
+                    }
+                }
+            });
         });
         if (!location.hash) {
             location.hash = '@(pageId)';
         }
-</script>
+    </script>
     <script type="text/javascript">
         $(function () {
             $(".jstree").css("max-height", $(window).height() - 200).css("overflow", "auto");

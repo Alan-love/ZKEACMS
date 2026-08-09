@@ -1,0 +1,34 @@
+@model ZKEACMS.Product.Models.ProductCategory
+@{
+    Script.Reqiured("validate").AtFoot();
+}
+<div class="panel panel-default">
+    <div class="panel-heading">
+        @L("Edit")
+    </div>
+    <div class="panel-body">
+        @using (Html.BeginForm())
+        {
+            @Html.EditorForModel()
+            <div class="toolBar">
+                @if (Authorizer.Authorize(ZKEACMS.Product.PermissionKeys.ManageProductCategory))
+                {
+                    <input type="submit" class="btn btn-primary" value="@L("Save")" data-value="@ActionType.Update" />
+                    <input type="submit" class="btn btn-primary" value="@L("Save And Exit")" data-value="@(ActionType.UpdateAndExit)" />
+                    <input type="submit" class="btn btn-danger delete" value="@L("Delete")" data-value="@ActionType.Delete" />
+                }
+                @Html.ChangeHistoryBtn(Model)
+                <a class="btn btn-default" href="@Url.Action("Index")">@L("Cancel")</a>
+            </div>
+        }
+
+    </div>
+</div>
+@using (Script.AtFoot())
+{
+    <script type="text/javascript">
+        $(".delete").click(function () {
+            return confirm("@L("Do you want to delete?")");
+        });
+    </script>
+}

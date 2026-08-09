@@ -21,12 +21,13 @@ using ZKEACMS.DataArchived;
 using ZKEACMS.ExtendField;
 using ZKEACMS.Layout;
 using ZKEACMS.Media;
-using ZKEACMS.Notification;
 using ZKEACMS.Options;
 using ZKEACMS.PackageManger;
 using ZKEACMS.Page;
+using ZKEACMS.PendingTask;
 using ZKEACMS.Product.Models;
 using ZKEACMS.Setting;
+using ZKEACMS.Sitemap.Service;
 using ZKEACMS.SMTP;
 using ZKEACMS.Theme;
 using ZKEACMS.Widget;
@@ -52,13 +53,14 @@ namespace ZKEACMS
 
             services.TryAddTransient<IDataArchivedService, DataArchivedService>();
             services.TryAddTransient<IExtendFieldService, ExtendFieldService>();
-            services.TryAddTransient<INotifyService, NotifyService>();
             services.AddTransient<IUserCenterLinksProvider, UserCenterLinksProvider>();
             services.AddTransient<IUserCenterLinkService, UserCenterLinkService>();
             services.TryAddScoped<ILayoutService, LayoutService>();
             services.TryAddScoped<ILayoutHtmlService, LayoutHtmlService>();
             services.TryAddTransient<IMediaService, MediaService>();
             services.TryAddScoped<IPageService, PageService>();
+            services.TryAddScoped<IPageContext, PageContext>();
+            services.AddTransient<ISiteUrlProvider, PageSiteUrlProvider>();
             services.TryAddScoped<IApplicationSettingService, ApplicationSettingService>();
             services.TryAddScoped<IThemeService, ThemeService>();
             services.TryAddTransient<IWidgetTemplateService, WidgetTemplateService>();
@@ -82,6 +84,9 @@ namespace ZKEACMS
             services.AddTransient<IStorage, WebStorage>();
             services.AddTransient<ICurrencyService, CurrencyService>();
             services.AddScoped<ITemplateService, TemplateService>();
+
+
+            services.TryAddTransient<IPendingTaskExecutor, PendingTaskExecutor>();
 
             services.ConfigureStateProvider<StateProvider.OuterChainPictureStateProvider>();
             services.ConfigureStateProvider<StateProvider.EnableResponsiveDesignStateProvider>();

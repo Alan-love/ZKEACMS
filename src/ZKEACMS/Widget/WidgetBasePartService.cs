@@ -6,9 +6,10 @@ using Easy;
 using Easy.Cache;
 using Easy.Extend;
 using Easy.RepositoryPattern;
+using Easy.Serializer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Newtonsoft.Json;
+using Microsoft.Extensions.Caching.Memory;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -22,17 +23,19 @@ namespace ZKEACMS.Widget
     {
         protected const string EncryptWidgetTemplate = "EncryptWidgetTemplate";
         private readonly IWidgetActivator _widgetActivator;
+        private readonly ICacheManager<WidgetBasePartService> _cacheManager;
+        private readonly ISignals _signals;
 
-        private readonly ICacheManager<IEnumerable<WidgetBase>> _pageWidgetCacheManage;
         public WidgetBasePartService(IApplicationContext applicationContext,
             IWidgetActivator widgetActivator,
-            ICacheManager<IEnumerable<WidgetBase>> pageWidgetCacheManage,
-            CMSDbContext dbContext, IEventManager eventManager)
+            ICacheManager<WidgetBasePartService> cacheManager,
+            CMSDbContext dbContext, IEventManager eventManager, ISignals signals)
             : base(applicationContext, dbContext)
         {
             _widgetActivator = widgetActivator;
-            _pageWidgetCacheManage = pageWidgetCacheManage;
+            _cacheManager = cacheManager;
             EventManager = eventManager;
+            _signals = signals;
         }
         public IEventManager EventManager { get; private set; }
         public override DbSet<WidgetBasePart> CurrentDbSet => DbContext.WidgetBasePart;
@@ -44,11 +47,11 @@ namespace ZKEACMS.Widget
 
         public IEnumerable<WidgetBase> GetByLayoutId(string layoutId)
         {
-            return Get(m => m.LayoutID == layoutId);
+            return Get(m => m.LayoutId == layoutId);
         }
         public IEnumerable<WidgetBase> GetByPageId(string pageId)
         {
-            return Get(m => m.PageID == pageId);
+            return Get(m => m.PageId == pageId);
         }
 
         public IEnumerable<WidgetBase> GetAllByPage(PageEntity page)
@@ -62,7 +65,23 @@ namespace ZKEACMS.Widget
             }
             if (page.IsPublishedPage)
             {
-                return _pageWidgetCacheManage.GetOrAdd(page.ID, page.ReferencePageID, (key, region) => getPageWidgets(page));
+                return _cacheManager.GetOrCreate(page.ID, factory =>
+                {
+                    factory.AddExpirationToken(_signals.When(page.ID));
+                    factory.AddExpirationToken(_signals.When(page.ReferencePageID));
+                    factory.AddExpirationToken(_signals.When(CacheSignals.PageWidgetChanged));
+
+                    if (page.Content.IsNotNullAndWhiteSpace())
+                    {
+                        var pageContent = JsonConverter.DeserializePolymorphic<PageContent>(page.Content);
+                        var layoutWidgets = GetByLayoutId(page.LayoutId);
+                        return layoutWidgets
+                            .Select(w => _widgetActivator.Create(w)?.GetWidget(w))
+                            .Concat(pageContent.Widgets)
+                            .ToList();
+                    }
+                    return getPageWidgets(page);
+                });
             }
             return getPageWidgets(page).Where(m => m != null);
         }
@@ -76,10 +95,10 @@ namespace ZKEACMS.Widget
             return getWidgets(roleId);
         }
 
-        public override ServiceResult<WidgetBasePart> Update(WidgetBasePart item)
+        public override ErrorOr<WidgetBasePart> Update(WidgetBasePart item)
         {
             var result = base.Update(item);
-            if (!result.HasViolation)
+            if (!result.HasError)
             {
                 EventManager.Trigger(Events.OnWidgetBasePartUpdated, item);
             }
@@ -94,10 +113,10 @@ namespace ZKEACMS.Widget
             var service = _widgetActivator.Create(widgetBasePart);
             var widgetBase = service.GetWidget(widgetBasePart.ToWidgetBase());
 
-            widgetBase.PageID = widget.PageID;
-            widgetBase.ZoneID = widget.ZoneID;
+            widgetBase.PageId = widget.PageId;
+            widgetBase.ZoneId = widget.ZoneId;
             widgetBase.Position = widget.Position;
-            widgetBase.LayoutID = widget.LayoutID;
+            widgetBase.LayoutId = widget.LayoutId;
             widgetBase.IsTemplate = false;
             widgetBase.IsSystem = false;
             widgetBase.Thumbnail = null;
@@ -114,12 +133,12 @@ namespace ZKEACMS.Widget
         }
         public void RemoveCache(string pageId)
         {
-            _pageWidgetCacheManage.ClearRegion(pageId);
+            _signals.Trigger(pageId);
         }
 
         public void ClearCache()
         {
-            _pageWidgetCacheManage.Clear();
+            _signals.Trigger(CacheSignals.PageWidgetChanged);
         }
 
         public IEnumerable<TWidget> GetAllWidgets<TWidgetService, TWidget>()
@@ -131,7 +150,7 @@ namespace ZKEACMS.Widget
             string assemblyName = serviceType.Assembly.GetName().Name;
             return Get(m => m.AssemblyName == assemblyName && m.ServiceTypeName == serviceTypeName).Select(m =>
             {
-                TWidget widget = JsonConvert.DeserializeObject<TWidget>(m.ExtendData);
+                TWidget widget = JsonConverter.Deserialize<TWidget>(m.ExtendData);
                 m.CopyTo(widget);
                 return widget;
             }).ToList();
@@ -142,10 +161,10 @@ namespace ZKEACMS.Widget
             BeginBulkSave();
             foreach (var item in widgets)
             {
-                item.ExtendData = JsonConvert.SerializeObject(item);
+                item.ExtendData = JsonConverter.Serialize(item);
                 Update(item.ToWidgetBasePart());
             }
-            SaveChanges();
+            EndBulkSave();
         }
     }
 }

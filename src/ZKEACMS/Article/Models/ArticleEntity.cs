@@ -38,20 +38,19 @@ namespace ZKEACMS.Article.Models
         {
             ViewConfig(m => m.ID).AsHidden().ShowInGrid().Order(1);
             ViewConfig(m => m.Title).AsTextBox().Required().Order(2).ShowInGrid().Search(Easy.LINQ.Query.Operators.Contains);
-            ViewConfig(m => m.Url).AsTextBox().Order(3).MaxLength(100).UrlPart().Required();
-            ViewConfig(m => m.Status).AsDropDownList().DataSource(DicKeys.RecordStatus, SourceType.Dictionary);
+            ViewConfig(m => m.Url).AsTextBox().Order(3).MaxLength(100).UrlPart().Required().RandomText();
+            ViewConfig(m => m.Status).AsDropDownList().DataSource(DicKeys.RecordStatus, SourceType.Dictionary).ShowInGrid();
             ViewConfig(m => m.ImageThumbUrl).AsTextBox().MediaSelector();
             ViewConfig(m => m.ImageUrl).AsTextBox().MediaSelector();
             ViewConfig(m => m.ArticleTypeID)
-                .AsDropDownList()
+                .AsDropDownTree("GetArticleTypeTree", "ArticleType", "admin")
                 .DataSource(ViewDataKeys.ArticleCategory, SourceType.ViewData)
-                .Required()
-                .SetTemplate("ArticleTypeTree")
+                .Required()                
                 .ShowInGrid();
 
             ViewConfig(m => m.ArticleContent).AsTextArea().AddClass(StringKeys.HtmlEditorClass);
-            ViewConfig(m => m.PublishDate).AsTextBox().Hide();
-            ViewConfig(m => m.IsPublish).AsTextBox().Hide().ShowInGrid();
+            ViewConfig(m => m.IsPublish).AsCheckBox().ShowInGrid();
+            ViewConfig(m => m.PublishDate).AsTextBox().FormatAsDateTime().ShowInGrid();
         }
     }
 

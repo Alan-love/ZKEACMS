@@ -2,253 +2,158 @@
  * Copyright (c) ZKEASOFT. All rights reserved. 
  * http://www.zkea.net/licenses */
 
+using Microsoft.AspNetCore.Hosting;
+using SixLabors.Fonts;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Drawing.Processing;
+using SixLabors.ImageSharp.Formats;
+using SixLabors.ImageSharp.Formats.Jpeg;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
 using System;
-using System.Collections.Generic;
-using System.Drawing;
-using System.Drawing.Drawing2D;
-using System.Drawing.Imaging;
 using System.IO;
-using System.Runtime.InteropServices;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace ZKEACMS.Captcha
 {
     public class DefaultImageGenerator : IImageGenerator
     {
-        private const float V = 4F;
-        public DefaultImageGenerator()
+        public DefaultImageGenerator(IWebHostEnvironment webHostEnvironment)
         {
-            Width = 200;
-            Height = 70;
-            Fonts = new List<FontFamily>
+            string fontDir = Path.Combine(webHostEnvironment.WebRootPath, "fonts");
+            var fontCollection = new FontCollection();
+            foreach (var item in Directory.GetFiles(fontDir, "*.ttf"))
             {
-                new FontFamily("Times New Roman"),
-                new FontFamily("Georgia"),
-                new FontFamily("Arial"),
-                new FontFamily("Comic Sans MS")
-            };
-
-            FontColor = Color.Blue;
-            Background = Color.White;
+                fontCollection.Add(item);
+            }
+            FontFamilies = fontCollection.Families.ToArray();
         }
+        public FontFamily[] FontFamilies { get; set; }
+        public Color[] TextColor { get; set; } = new Color[] 
+        {
+            Color.Blue, Color.Black, Color.Red, Color.Brown, Color.Green, Color.DarkBlue, Color.DarkCyan,
+            Color.DarkGoldenrod, Color.DarkGray, Color.DarkGreen, Color.DarkKhaki, Color.DarkMagenta, Color.DarkOliveGreen, Color.DarkOrange,Color.DarkOrchid,
+            Color.DarkRed,Color.DarkSalmon, Color.DarkSeaGreen,Color.DarkSlateBlue,Color.DarkTurquoise,Color.DarkViolet
+        };
+        public Color[] DrawLinesColor { get; set; } = new Color[] { Color.LightBlue, Color.LightCoral, Color.LightCyan, Color.LightGray, Color.LightPink, Color.LightSalmon, Color.LightSeaGreen, Color.LightSkyBlue, Color.LightSlateGray, Color.LightSteelBlue };
+        public float MinLineThickness { get; set; } = 0.7f;
+        public float MaxLineThickness { get; set; } = 2.0f;
+        public ushort Width { get; set; } = 100;
+        public ushort Height { get; set; } = 35;
+        public ushort NoiseRate { get; set; } = 20;
+        public Color[] NoiseRateColor { get; set; } = new Color[] { Color.LightBlue, Color.LightCoral, Color.LightCyan, Color.LightGray, Color.LightPink, Color.LightSalmon, Color.LightSeaGreen, Color.LightSkyBlue, Color.LightSlateGray, Color.LightSteelBlue };
+        public byte FontSize { get; set; } = 25;
+        public FontStyle FontStyle { get; set; } = FontStyle.Regular;
+        public EncoderTypes EncoderType { get; set; } = EncoderTypes.Jpeg;
+        public IImageEncoder Encoder { get { return GetEncoder(EncoderType); } }
+        public byte DrawLines { get; set; } = 5;
+        public byte MaxRotationDegrees { get; set; } = 5;
 
-        public Color FontColor { get; set; }
-
-        public Color Background { get; set; }
-
-        public ushort Width { get; set; }
-
-        public ushort Height { get; set; }
-
-        public IList<FontFamily> Fonts { get; private set; }
+        private Random _random { get; set; } = new Random(DateTime.Now.Microsecond);
 
         public byte[] Generate(string text)
         {
-            bool isWindowsOS = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
-            var random = new Random();
+            byte[] result;
 
-            FontFamily familyName = Fonts[random.Next(Fonts.Count - 1)];
-            var bitmap = new Bitmap(
-                Width,
-                Height,
-                PixelFormat.Format32bppArgb);
-
-            using (Graphics graph = Graphics.FromImage(bitmap))
+            using (var imgText = new Image<Rgba32>(Width, Height))
             {
-                graph.SmoothingMode = SmoothingMode.AntiAlias;
-                var rect = new Rectangle(0, 0, Width, Height);
+                float position = 0;
+                byte startWith = (byte)_random.Next(0, 10);
+                imgText.Mutate(ctx => ctx.BackgroundColor(Color.Transparent));
+                var fontFamily = FontFamilies[_random.Next(0, FontFamilies.Length)];
+                var font = new Font(fontFamily, FontSize, FontStyle);
 
-                // Fill in the background.
-                using (var brush = new HatchBrush(
-                    HatchStyle.SmallConfetti,
-                    Color.LightGray,
-                    Background))
+                foreach (char c in text)
                 {
-                    graph.FillRectangle(brush, rect);
+                    var location = new PointF(startWith + position, _random.Next(0, 13));
+                    imgText.Mutate(ctx => ctx.DrawText(c.ToString(), font, TextColor[_random.Next(0, TextColor.Length)], location));
+                    position += TextMeasurer.MeasureSize(c.ToString(), new TextOptions(font)).Width;
+                }
 
-                    // Set up the text format.
-                    var format = new StringFormat
-                    {
-                        Alignment = StringAlignment.Center,
-                        LineAlignment = StringAlignment.Center,
-                        FormatFlags = StringFormatFlags.NoWrap | StringFormatFlags.NoClip,
-                        Trimming = StringTrimming.None
-                    };
+                var rotation = GetRotation();
+                imgText.Mutate(ctx => ctx.Transform(rotation));
 
-                    format.SetMeasurableCharacterRanges(new[] { new CharacterRange(0, text.Length) });
+                ushort size = (ushort)TextMeasurer.MeasureSize(text, new TextOptions(font)).Width;
+                var img = new Image<Rgba32>(size + 10 + 5, Height);
+                img.Mutate(ctx => ctx.BackgroundColor(Color.White));
 
-                    // Set up the text font.
-                    RectangleF size;
-                    float fontSize = rect.Height + 1;
-                    Font font = null;
-                    // Adjust the font size until the text fits within the image.
-                    do
-                    {
-                        if (font != null)
-                            font.Dispose();
-                        fontSize--;
-                        font = new Font(
-                            familyName,
-                            fontSize,
-                            FontStyle.Bold);
-                        size = graph.MeasureCharacterRanges(text, font, rect, format)[0].GetBounds(graph);
-                    } while (size.Width > rect.Width || size.Height > rect.Height);
+                Parallel.For(0, DrawLines, i =>
+                {
+                    int x0 = _random.Next(0, _random.Next(0, 30));
+                    int y0 = _random.Next(10, img.Height);
+                    int x1 = _random.Next(img.Width / 2, img.Width);
+                    int y1 = _random.Next(0, img.Height);
+                    img.Mutate(ctx =>
+                            ctx.DrawLine(TextColor[_random.Next(0, TextColor.Length)].WithAlpha(0.5f),
+                                          GenerateNextFloat(MinLineThickness, MaxLineThickness),
+                                          new PointF[] { new PointF(x0, y0), new PointF(x1, y1) })
+                            );
+                });
 
-                    var path = new GraphicsPath();
-                    path.AddString(
-                        text,
-                        font.FontFamily,
-                        (int)font.Style,
-                        graph.DpiY * font.Size / 72, rect,
-                        format);
+                Parallel.For(0, NoiseRate, i =>
+                {
+                    int x0 = _random.Next(0, img.Width);
+                    int y0 = _random.Next(0, img.Height);
+                    int size = _random.Next(1, 4);
+                    img.Mutate(
+                                ctx =>
+                                {
+                                    ctx.Fill(NoiseRateColor[_random.Next(0, NoiseRateColor.Length)], new RectangleF(new PointF(x0, y0), new SizeF(size, size)));
+                                }
+                            );
+                });
 
-                    var matrix = new Matrix();
-                    if (isWindowsOS)
-                    {
-                        PointF[] points =
-                            {
-                                new PointF(
-                                    random.Next(rect.Width)/V,
-                                    random.Next(rect.Height)/V),
-                                new PointF(
-                                    rect.Width - random.Next(rect.Width)/V,
-                                    random.Next(rect.Height)/V),
-                                new PointF(
-                                    random.Next(rect.Width)/V,
-                                    rect.Height - random.Next(rect.Height)/V),
-                                new PointF(
-                                    rect.Width - random.Next(rect.Width)/V,
-                                    rect.Height - random.Next(rect.Height)/V)
-                            };
+                img.Mutate(ctx => ctx.DrawImage(imgText, 0.80f));
 
-                        matrix.Translate(0F, 0F);
-                        path.Warp(points, rect, matrix, WarpMode.Perspective, 0F); //Not work on linux
-                    }
-                    else
-                    {
-                        matrix.Translate(0F, random.Next(-rect.Height, rect.Height) / 5F);
-                        path.Transform(matrix);
-                    }
+                img.Mutate(x =>
+                {
+                    x.Resize(Width, Height);
+                });
 
-                    // Draw the text.
-                    using (var hatchBrush = new HatchBrush(
-                        HatchStyle.LargeConfetti,
-                        Color.LightGray,
-                        FontColor))
-                    {
-                        graph.FillPath(hatchBrush, path);
-
-                        // Add some random noise.
-                        int m = Math.Max(rect.Width, rect.Height);
-                        for (int i = 0; i < (int)(rect.Width * rect.Height / 30F); i++)
-                        {
-                            int x = random.Next(rect.Width);
-                            int y = random.Next(rect.Height);
-                            int w = random.Next(m / 50);
-                            int h = random.Next(m / 50);
-                            graph.FillEllipse(hatchBrush, x, y, w, h);
-                        }
-                    }
-                    // Clean up.
-
-                    format.Dispose();
-                    font.Dispose();
-                    path.Dispose();
-                    matrix.Dispose();
+                using (var ms = new MemoryStream())
+                {
+                    img.Save(ms, Encoder);
+                    result = ms.ToArray();
                 }
             }
-            AdjustRippleEffect(bitmap);
-            using (bitmap)
-            {
-                using (MemoryStream ms = new MemoryStream())
-                {
-                    bitmap.Save(ms, ImageFormat.Jpeg);
-                    return ms.ToArray();
-                }
-            }
+
+            return result;
         }
 
-        void AdjustRippleEffect(Bitmap baseMap)
+        public static IImageEncoder GetEncoder(EncoderTypes encoderType)
         {
-            short nWave = 6;
-            int nWidth = baseMap.Width;
-            int nHeight = baseMap.Height;
-
-            Point[,] pt = new Point[nWidth, nHeight];
-
-            for (int x = 0; x < nWidth; ++x)
+            IImageEncoder encoder;
+            switch (encoderType)
             {
-                for (int y = 0; y < nHeight; ++y)
-                {
-                    var xo = nWave * Math.Sin(2.0 * 3.1415 * y / 128.0);
-                    var yo = nWave * Math.Cos(2.0 * 3.1415 * x / 128.0);
+                case EncoderTypes.Png:
+                    encoder = new PngEncoder();
+                    break;
+                case EncoderTypes.Jpeg:
+                    encoder = new JpegEncoder();
+                    break;
+                default:
+                    throw new ArgumentException($"Encoder '{encoderType}' not found!");
+            };
+            return encoder;
+        }
+        private float GenerateNextFloat(double min = -3.40282347E+38, double max = 3.40282347E+38)
+        {
+            double range = max - min;
+            double sample = _random.NextDouble();
+            double scaled = (sample * range) + min;
+            float result = (float)scaled;
+            return result;
+        }
 
-                    var newX = x + xo;
-                    var newY = y + yo;
-
-                    if (newX > 0 && newX < nWidth)
-                    {
-                        pt[x, y].X = (int)newX;
-                    }
-                    else
-                    {
-                        pt[x, y].X = 0;
-                    }
-
-
-                    if (newY > 0 && newY < nHeight)
-                    {
-                        pt[x, y].Y = (int)newY;
-                    }
-                    else
-                    {
-                        pt[x, y].Y = 0;
-                    }
-                }
-            }
-
-            Bitmap bSrc = (Bitmap)baseMap.Clone();
-
-            BitmapData bitmapData = baseMap.LockBits(new Rectangle(0, 0, baseMap.Width, baseMap.Height), ImageLockMode.ReadWrite, PixelFormat.Format24bppRgb);
-            BitmapData bmSrc = bSrc.LockBits(new Rectangle(0, 0, bSrc.Width, bSrc.Height), ImageLockMode.ReadWrite, PixelFormat.Format24bppRgb);
-
-            int scanline = bitmapData.Stride;
-
-            IntPtr scan0 = bitmapData.Scan0;
-            IntPtr srcScan0 = bmSrc.Scan0;
-
-            unsafe
-            {
-                byte* p = (byte*)(void*)scan0;
-                byte* pSrc = (byte*)(void*)srcScan0;
-
-                int nOffset = bitmapData.Stride - baseMap.Width * 3;
-
-                for (int y = 0; y < nHeight; ++y)
-                {
-                    for (int x = 0; x < nWidth; ++x)
-                    {
-                        var xOffset = pt[x, y].X;
-                        var yOffset = pt[x, y].Y;
-
-                        if (yOffset >= 0 && yOffset < nHeight && xOffset >= 0 && xOffset < nWidth)
-                        {
-                            if (pSrc != null)
-                            {
-                                p[0] = pSrc[yOffset * scanline + xOffset * 3];
-                                p[1] = pSrc[yOffset * scanline + xOffset * 3 + 1];
-                                p[2] = pSrc[yOffset * scanline + xOffset * 3 + 2];
-                            }
-                        }
-
-                        p += 3;
-                    }
-                    p += nOffset;
-                }
-            }
-
-            baseMap.UnlockBits(bitmapData);
-            bSrc.UnlockBits(bmSrc);
-            bSrc.Dispose();
+        private AffineTransformBuilder GetRotation()
+        {
+            var builder = new AffineTransformBuilder();
+            var pointF = new PointF(_random.Next(0, Width), _random.Next(0, Height));
+            var rotationDegrees = _random.Next(0, MaxRotationDegrees);
+            var result = builder.PrependRotationDegrees(rotationDegrees, pointF);
+            return result;
         }
     }
 }

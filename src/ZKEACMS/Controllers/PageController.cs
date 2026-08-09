@@ -113,7 +113,6 @@ namespace ZKEACMS.Controllers
             return View("Edit", page);
         }
 
-
         [HttpPost, DefaultAuthorize(Policy = PermissionKeys.ManagePage)]
         public override IActionResult Edit(PageEntity entity)
         {
@@ -133,39 +132,46 @@ namespace ZKEACMS.Controllers
                 ModelState.AddModelError("PageUrl", ex.Message);
                 return View(entity);
             }
-            if (entity.ActionType == ActionType.Design)
+            if (entity.ActionType.HasFlag(ActionType.Exit))
+            {
+                return RedirectToAction("Index", new { PageId = entity.ID });
+            }
+            if (entity.ActionType.HasFlag(ActionType.Design))
             {
                 return RedirectToAction("Design", new { entity.ID });
             }
-            else if (entity.ActionType == ActionType.Delete)
+            else if (entity.ActionType.HasFlag(ActionType.Delete))
             {
                 Service.Remove(entity);
                 return RedirectToAction("Index");
             }
-            else if (entity.ActionType == ActionType.Publish)
+            else if (entity.ActionType.HasFlag(ActionType.Publish))
             {
                 var result = Service.Publish(entity);
-                if (result.HasViolation)
+                if (result.HasError)
                 {
                     ModelState.AddUnknownError(result.ErrorMessage);
                     return View(entity);
                 }
                 return RedirectView(entity.ID, false);
             }
-            return RedirectToAction("Index", new { PageID = entity.ID });
+            return RedirectToAction("Edit", new { Id = entity.ID });
         }
+
         [EditWidget, DefaultAuthorize(Policy = PermissionKeys.ManagePage)]
         public IActionResult Design(string ID)
         {
             ViewBag.CanPasteWidget = HttpContext.RequestServices.GetService<ICookie>().GetValue<string>(Const.CopyWidgetCookie).IsNotNullAndWhiteSpace();
             return View();
         }
+
         [ViewPage, DefaultAuthorize(Policy = PermissionKeys.ViewPage)]
         public IActionResult ViewPage(string ID)
         {
             return View("PreView");
         }
-        [HttpPost]
+
+        [HttpPost, DefaultAuthorize(Policy = PermissionKeys.ManagePage)]
         public JsonResult Revert(string ID, bool RetainLatest)
         {
             Service.Revert(ID, RetainLatest);
@@ -175,7 +181,8 @@ namespace ZKEACMS.Controllers
             });
 
         }
-        [HttpPost]
+
+        [HttpPost, DefaultAuthorize(Policy = PermissionKeys.ManagePage)]
         public JsonResult DeleteVersion(string ID)
         {
             Service.DeleteVersion(ID);
@@ -185,6 +192,8 @@ namespace ZKEACMS.Controllers
             });
 
         }
+
+        [DefaultAuthorize(Policy = PermissionKeys.ViewPage)]
         public IActionResult RedirectView(string Id, bool? preview)
         {
             var pathArray = Service.Get(Id).Url.Split('/');
@@ -195,25 +204,27 @@ namespace ZKEACMS.Controllers
             var url = string.Join("/", pathArray);
             return Redirect(url + ((preview ?? true) ? "?ViewType=" + ReView.Review : ""));
         }
+
         [DefaultAuthorize(Policy = PermissionKeys.ViewPage)]
         public IActionResult Select()
         {
             return View();
         }
+
         [DefaultAuthorize(Policy = PermissionKeys.ViewPage)]
         public IActionResult PageZones(QueryContext context)
         {
             ILayoutService layoutService = HttpContext.RequestServices.GetService<ILayoutService>();
             IWidgetBasePartService widgetBasePartService = HttpContext.RequestServices.GetService<IWidgetBasePartService>();
             IRuleService ruleService = HttpContext.RequestServices.GetService<IRuleService>();
-            var page = Service.Get(context.PageID);
+            var page = Service.Get(context.PageId);
             var layout = layoutService.GetByPage(page);
             var viewModel = new LayoutZonesViewModel
             {
                 Page = page,
                 Layout = layout,
-                PageID = context.PageID,
-                LayoutID = layout.ID,
+                PageId = context.PageId,
+                LayoutId = layout.ID,
                 Zones = layout.Zones,
                 Widgets = widgetBasePartService.GetAllByPage(page),
                 LayoutHtml = layout.Html
@@ -242,33 +253,44 @@ namespace ZKEACMS.Controllers
 
             return View(viewModel);
         }
+
         [HttpPost, DefaultAuthorize(Policy = PermissionKeys.ManagePage)]
         public JsonResult MovePage(string id, int position, int oldPosition)
         {
             Service.Move(id, position, oldPosition);
             return Json(true);
         }
+
         [HttpPost, DefaultAuthorize(Policy = PermissionKeys.ManagePage)]
         public JsonResult Publish(string id)
         {
             var result = Service.Publish(Service.Get(id));
             return Json(result);
         }
+
         [DefaultAuthorize(Policy = PermissionKeys.ManagePage)]
         public IActionResult PublishPage(string ID, string ReturnUrl)
         {
             var result = Service.Publish(Service.Get(ID));
-            if (result.HasViolation)
+            if (result.HasError)
             {
                 ModelState.AddUnknownError(result.ErrorMessage);
                 return Edit(ID);
             }
             return Redirect(ReturnUrl);
         }
+
         [DefaultAuthorize(Policy = PermissionKeys.ManagePage)]
         public IActionResult ChangeUrl(string ID)
         {
             return View(Service.Get(ID));
+        }
+
+        [DefaultAuthorize(Policy = PermissionKeys.ManagePage)]
+        public IActionResult ResetLayout(string pageId)
+        {
+            Service.ResetLayout(pageId);
+            return RedirectToAction("Edit", new { Id = pageId });
         }
     }
 }

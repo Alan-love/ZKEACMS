@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using Easy.Constant;
 using System.Linq.Expressions;
+using Easy.AuditTrail;
 
 namespace Easy.Modules.Role
 {
@@ -14,14 +15,20 @@ namespace Easy.Modules.Role
     {
         private readonly IPermissionService _permissionService;
         private readonly IUserRoleRelationService _userRoleRelationService;
+        private readonly IAuditTrailService _auditTrailService;
+        private readonly ILocalize _localize;
         public RoleService(IPermissionService permissionService,
             IUserRoleRelationService userRoleRelationService,
             IApplicationContext applicationContext,
-            EasyDbContext easyDbContext)
+            EasyDbContext easyDbContext,
+            IAuditTrailService auditTrailService,
+            ILocalize localize)
             : base(applicationContext, easyDbContext)
         {
             _permissionService = permissionService;
             _userRoleRelationService = userRoleRelationService;
+            _auditTrailService = auditTrailService;
+            _localize = localize;
         }
 
         public override DbSet<RoleEntity> CurrentDbSet
@@ -32,12 +39,12 @@ namespace Easy.Modules.Role
             }
         }
 
-        public ServiceResult<RoleEntity> Add(RoleEntity roleEntity, List<PermissionDescriptor> permissionDescriptors)
+        public ErrorOr<RoleEntity> Add(RoleEntity roleEntity, List<PermissionDescriptor> permissionDescriptors)
         {
             return BeginTransaction(() =>
             {
                 var result = Add(roleEntity);
-                if (result.HasViolation) return result;
+                if (result.HasError) return result;
                 var permissions = new List<Permission>();
                 permissionDescriptors.Where(m => m.Checked ?? false).Each(m =>
                 {
@@ -60,11 +67,12 @@ namespace Easy.Modules.Role
             return _permissionService.Get(m => m.RoleId == roleId);
         }
 
-        public ServiceResult<RoleEntity> Update(RoleEntity roleEntity, List<PermissionDescriptor> permissionDescriptors)
+        public ErrorOr<RoleEntity> Update(RoleEntity roleEntity, List<PermissionDescriptor> permissionDescriptors)
         {
             return BeginTransaction(() =>
             {
-                var permissions = _permissionService.Get(m => m.RoleId == roleEntity.ID);
+                var oldPermissions = GetPermissionForAudit(roleEntity.ID);
+                var permissions = GetPermission(roleEntity.ID);
                 permissions.Each(m => m.ActionType = ActionType.Delete);
                 permissionDescriptors.Where(m => m.Checked ?? false).Each(m =>
                 {
@@ -93,30 +101,30 @@ namespace Easy.Modules.Role
                 _permissionService.BeginBulkSave();
                 permissions.Each(m =>
                 {
-                    switch (m.ActionType)
+                    if (m.ActionType.HasFlag(ActionType.Create))
                     {
-                        case ActionType.Create:
-                            {
-                                _permissionService.Add(m);
-                                break;
-                            }
-                        case ActionType.Update:
-                            {
-                                _permissionService.Update(m);
-                                break;
-                            }
-                        case ActionType.Delete:
-                            {
-                                _permissionService.Remove(m);
-                                break;
-                            }
+                        _permissionService.Add(m);
+                    }
+                    else if (m.ActionType.HasFlag(ActionType.Update))
+                    {
+                        _permissionService.Update(m);
+                    }
+                    else if (m.ActionType.HasFlag(ActionType.Delete))
+                    {
+                        _permissionService.Remove(m);
                     }
                 });
-                _permissionService.SaveChanges();
+                _permissionService.EndBulkSave();
 
-                var old = Get(roleEntity.ID);
-                roleEntity.CopyTo(old);
-                return Update(old);
+                var oldRole = Get(roleEntity.ID);
+                var saveResult = Update(roleEntity);
+                if (saveResult.IsSuccess)
+                {
+                    var newPermission = GetPermissionForAudit(roleEntity.ID);
+                    _auditTrailService.AuditUpdate(oldRole, roleEntity);
+                    _auditTrailService.AuditUpdate<RoleEntity>(roleEntity.ID.ToString(), _localize.Get("Permission"), oldPermissions, newPermission);
+                }
+                return saveResult;
             });
         }
 
@@ -142,6 +150,16 @@ namespace Easy.Modules.Role
                 _userRoleRelationService.Remove(m => roles.Contains(m.RoleID));
                 base.RemoveRange(items);
             });
+        }
+
+        private IEnumerable<Permission> GetPermissionForAudit(int roleId)
+        {
+            var permissions = _permissionService.Get(m => m.RoleId == roleId);
+            permissions.Each(m =>
+            {
+                m.Title = _localize.Get(m.Title);
+            });
+            return permissions;
         }
     }
 }

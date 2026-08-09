@@ -1,7 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
-    <TargetFramework>net5.0</TargetFramework>
+    <TargetFramework>net9.0</TargetFramework>
     <AssemblyName>EasyFrameWork</AssemblyName>
     <PackageId>EasyFrameWork</PackageId>
     <Copyright>深圳市纸壳软件科技有限公司 ZKEASOFT</Copyright>
@@ -11,21 +10,23 @@
     <RepositoryType>git</RepositoryType>
     <PackageTags>EasyFrameWork</PackageTags>
     <Authors>深圳市纸壳软件科技有限公司 ZKEASOFT</Authors>
+    <RootNamespace>Easy</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <FrameworkReference Include="Microsoft.AspNetCore.App"></FrameworkReference>
+    <FrameworkReference Include="Microsoft.AspNetCore.App">
+    </FrameworkReference>
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="DocumentFormat.OpenXml" Version="2.13.1" />
-    <PackageReference Include="IdGen" Version="3.0.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="5.0.10" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="5.0.10" />
-    <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="5.0.10" />
-    <PackageReference Include="Microsoft.Extensions.DependencyModel" Version="5.0.0" />
-    <PackageReference Include="System.ComponentModel.Annotations" Version="5.0.0" />
-    <PackageReference Include="System.Reflection.Extensions" Version="4.3.0" />
-    <PackageReference Include="System.Reflection.TypeExtensions" Version="4.7.0" />
-    <PackageReference Include="System.Runtime.Loader" Version="4.3.0" />
-    <PackageReference Include="CacheManager.Core" Version="2.0.0-beta-1629" />
+    <PackageReference Include="DocumentFormat.OpenXml" />
+    <PackageReference Include="FastExpressionCompiler" />
+    <PackageReference Include="IdGen" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" />
+    <PackageReference Include="Microsoft.Extensions.DependencyModel" />
+    <PackageReference Include="System.Reflection.Extensions" />
+    <PackageReference Include="System.Reflection.TypeExtensions" />
+    <PackageReference Include="System.Runtime.Loader" />
+    <PackageReference Include="YamlDotNet" />
   </ItemGroup>
 </Project>

@@ -19,38 +19,38 @@ namespace ZKEACMS.Common.Service
         }
         public override DbSet<CarouselItemEntity> CurrentDbSet => DbContext.CarouselItem;
 
-        public override ServiceResult<CarouselItemEntity> Add(CarouselItemEntity item)
+        public override ErrorOr<CarouselItemEntity> Add(CarouselItemEntity item)
         {
-            if (item.ActionType != ActionType.Unattached)
+            if (!item.ActionType.HasFlag(ActionType.UnAttach))
             {
                 return base.Add(item);
             }
-            return new ServiceResult<CarouselItemEntity>();
+            return new ErrorOr<CarouselItemEntity>();
         }
-        public override ServiceResult<CarouselItemEntity> Update(CarouselItemEntity item)
+        public override ErrorOr<CarouselItemEntity> Update(CarouselItemEntity item)
         {
-            if (item.ActionType == ActionType.Update)
+            if (item.ActionType.HasFlag(ActionType.Update))
             {
                 return base.Update(item);
             }
-            else if (item.ActionType == ActionType.Create)
+            else if (item.ActionType.HasFlag(ActionType.Create))
             {
                 return base.Add(item);
             }
-            else if (item.ActionType == ActionType.Delete)
+            else if (item.ActionType.HasFlag(ActionType.Delete))
             {
                 if (item.ID > 0)
                 {
                     Remove(item);
-                }                
+                }
             }
-            return new ServiceResult<CarouselItemEntity>();
+            return new ErrorOr<CarouselItemEntity>();
         }
 
-        public override ServiceResult<CarouselItemEntity> UpdateRange(params CarouselItemEntity[] items)
+        public override ErrorOr<CarouselItemEntity> UpdateRange(params CarouselItemEntity[] items)
         {
             items.Each(m => Update(m));
-            return new ServiceResult<CarouselItemEntity>();
+            return new ErrorOr<CarouselItemEntity>();
         }
     }
 }

@@ -162,3 +162,8 @@ node_modules
 
 # ZKEACMS App Data
 App_Data/
+*.db
+/src/ZKEACMS.WebHost/Temp
+/src/ZKEACMS.WebHost/Logs
+.env
+.playwright-mcp

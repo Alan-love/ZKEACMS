@@ -13,6 +13,7 @@ namespace ZKEACMS
 {
     public interface IDBContextProvider
     {
+        DbContext Current { get; }
         IEnumerable<DbContext> GetAvailableDbContexts();
     }
 }

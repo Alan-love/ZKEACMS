@@ -2,8 +2,12 @@
  * Copyright (c) ZKEASOFT. All rights reserved. 
  * http://www.zkea.net/licenses */
 
+using Easy.Reflection;
 using System;
 using System.Collections;
+using System.Collections.Concurrent;
+using System.Linq.Expressions;
+using System.Reflection;
 using System.Text;
 
 namespace Easy.RuleEngine.RuleProviders
@@ -17,10 +21,9 @@ namespace Easy.RuleEngine.RuleProviders
             {
                 if (ruleContext.Arguments[0] is string)
                 {
-                    var property = workContext.GetType().GetProperty(ruleContext.Arguments[0].ToString());
-                    if (property != null)
+                    try
                     {
-                        ruleContext.Result = property.GetValue(workContext);
+                        ruleContext.Result = PropertyHelper.GetValue(workContext, ruleContext.Arguments[0].ToString());
                         if (ruleContext.Result is IEnumerable && ruleContext.Arguments.Length == 2)
                         {
                             int index = Convert.ToInt32(ruleContext.Arguments[1]);
@@ -38,9 +41,14 @@ namespace Easy.RuleEngine.RuleProviders
                             ruleContext.Result = resultAt;
                         }
                     }
+                    catch (Exception ex)
+                    {
+                        ruleContext.Result = ex.Message;
+                    }
                 }
 
             }
         }
+
     }
 }

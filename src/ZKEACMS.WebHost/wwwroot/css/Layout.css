@@ -3,6 +3,7 @@
  * http://www.zkea.net/licenses */
 
 @import "./glyphicon/css/glyphicon.css";
+@import "./material-symbols.css";
 
 .zk-btn {
     display: inline-block;
@@ -1560,8 +1561,12 @@ label.additional {
 
 
 .sort-handle {
-    cursor: move;
+    cursor: grab;
 }
+
+    .sort-handle:active {
+        cursor: grabbing;
+    }
 
 .zoneToolbar {
     position: absolute;
@@ -1886,9 +1891,14 @@ label.additional {
 
 
     .templates .widget-design {
-        cursor: move;
+        cursor: grab;
         position: relative;
     }
+
+        .widget-design.ui-draggable-dragging,
+        .templates .widget-design:active {
+            cursor: grabbing;
+        }
 
     .templates .delete-template {
         position: absolute;
@@ -1946,13 +1956,14 @@ li.ui-sortable-helper {
     }
 
 .template-list .thumbnail .img {
-    width: 140px;
+    width: 100%;
     height: 140px;
     display: flex;
     flex-wrap: nowrap;
     align-content: center;
     justify-content: center;
     align-items: center;
+    overflow: hidden;
 }
 
 .ui-draggable-dragging {

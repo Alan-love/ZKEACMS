@@ -18,6 +18,7 @@ using Easy.LINQ;
 using Easy.ViewPort.Descriptor;
 using Easy.Models;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Easy.Mvc.TagHelpers
 {
@@ -66,7 +67,7 @@ namespace Easy.Mvc.TagHelpers
                 }
             }
             var viewConfig = ServiceLocator.GetViewConfigure(ModelType);
-            var localize = ServiceLocator.GetService<ILocalize>();
+            var localize = ViewContext.HttpContext.RequestServices.GetService<ILocalize>();
             StringBuilder tableHeaderBuilder = new StringBuilder();
             StringBuilder tableSearchBuilder = new StringBuilder();
             if (viewConfig != null)
@@ -75,7 +76,7 @@ namespace Easy.Mvc.TagHelpers
 
                 if ((EditAble ?? true) && primaryKey != null)
                 {
-                    string name = primaryKey.Name.FirstCharToLowerCase();
+                    string name = primaryKey.Name.ToCamelCaseNaming();
                     if (name.Length == 2)
                     {
                         name = name.ToLower();
@@ -104,7 +105,7 @@ namespace Easy.Mvc.TagHelpers
 
                     actionPartBuilder.AppendLine(ActionLable ?? localize.Get("Action"));
                     tableHeaderBuilder.AppendFormat(TableHeadStructure,
-                        string.Empty,
+                        name,
                         WebUtility.HtmlEncode(managerBuiller.ToString()),
                         string.Empty,
                         actionPartBuilder,
@@ -149,7 +150,7 @@ namespace Easy.Mvc.TagHelpers
                             optionBuilder.AppendFormat("{{\"name\":\"{0}\",\"value\":\"{1}\"}},", localize.Get("No"), "false");
                         }
                         tableHeaderBuilder.AppendFormat(TableHeadStructure,
-                            m.Name.FirstCharToLowerCase(),
+                            m.Name.ToCamelCaseNaming(),
                             WebUtility.HtmlEncode(m.GridColumnTemplate),
                             OrderAsc == m.Name ? "asc" : OrderDesc == m.Name ? "desc" : "",
                             m.DisplayName,
@@ -165,7 +166,7 @@ namespace Easy.Mvc.TagHelpers
                 foreach (var property in ModelType.GetProperties())
                 {
                     tableHeaderBuilder.AppendFormat(TableHeadStructure,
-                            property.Name.FirstCharToLowerCase(),
+                            property.Name.ToCamelCaseNaming(),
                             string.Empty,
                             OrderAsc == property.Name ? "asc" : OrderDesc == property.Name ? "desc" : "",
                             property.Name,

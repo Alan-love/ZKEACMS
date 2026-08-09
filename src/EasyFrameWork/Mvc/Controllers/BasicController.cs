@@ -11,6 +11,9 @@ using Easy.Constant;
 using Easy.LINQ;
 using System.Linq;
 using System.Linq.Expressions;
+using Easy.Extend;
+using System.ComponentModel.DataAnnotations;
+using System.Reflection;
 
 namespace Easy.Mvc.Controllers
 {
@@ -47,15 +50,19 @@ namespace Easy.Mvc.Controllers
             if (ModelState.IsValid)
             {
                 var result = Service.Add(entity);
-                if (result.HasViolation)
+                if (result.HasError)
                 {
-                    foreach (var item in result.RuleViolations)
+                    foreach (var item in result.Errors)
                     {
-                        ModelState.AddModelError(item.ParameterName, item.ErrorMessage);
+                        ModelState.AddModelError(item.ParameterName, item.Message);
                     }
                     return View(entity);
                 }
-                return RedirectToAction("Index");
+                if (entity.ActionType.HasFlag(ActionType.Exit))
+                {
+                    return RedirectToAction("Index");
+                }
+                return RedirectToAction("Edit", new { Id = GetPrimaryKeyValue(entity) });
             }
             return View(entity);
         }
@@ -76,7 +83,7 @@ namespace Easy.Mvc.Controllers
         [HttpPost]
         public virtual IActionResult Edit(TEntity entity)
         {
-            if (entity.ActionType == ActionType.Delete)
+            if (entity.ActionType.HasFlag(ActionType.Delete))
             {
                 Service.Remove(entity);
                 return RedirectToAction("Index");
@@ -85,15 +92,19 @@ namespace Easy.Mvc.Controllers
             if (ModelState.IsValid)
             {
                 var result = Service.Update(entity);
-                if (result.HasViolation)
+                if (result.HasError)
                 {
-                    foreach (var item in result.RuleViolations)
+                    foreach (var item in result.Errors)
                     {
-                        ModelState.AddModelError(item.ParameterName, item.ErrorMessage);
+                        ModelState.AddModelError(item.ParameterName, item.Message);
                     }
                     return View(entity);
                 }
-                return RedirectToAction("Index");
+                if (entity.ActionType.HasFlag(ActionType.Exit))
+                {
+                    return RedirectToAction("Index");
+                }
+                return RedirectToAction("Edit", new { Id = GetPrimaryKeyValue(entity) });
             }
             return View(entity);
         }
@@ -135,6 +146,19 @@ namespace Easy.Mvc.Controllers
         {
             Service.Dispose();
             base.Dispose(disposing);
+        }
+
+        private TPrimarykey GetPrimaryKeyValue(TEntity entity)
+        {
+            var myClassType = entity.GetType();
+            foreach (var propertyInfo in myClassType.GetProperties())
+            {
+                var keyAttribute = propertyInfo.GetCustomAttribute<KeyAttribute>();
+                if (keyAttribute == null) continue;
+
+                return (TPrimarykey)propertyInfo.GetValue(entity);
+            }
+            return default;
         }
     }
 }

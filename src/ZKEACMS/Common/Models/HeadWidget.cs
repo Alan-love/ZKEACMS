@@ -20,7 +20,8 @@ namespace ZKEACMS.Common.Models
         protected override void ViewConfigure()
         {
             base.ViewConfigure();
-            ViewConfig(m => m.Content).AsTextArea().AsCodeEditor().Order(NextOrder()).Required();
+            ViewConfig(m => m.Title).AsHidden();
+            ViewConfig(m => m.Content).AsTextArea().AsCodeEditor("html").Order(NextOrder()).Required();
         }
     }
 }

@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Hosting;
 using System;
+using System.IO;
 using ZKEACMS.PackageManger;
 using ZKEACMS.Theme;
 
@@ -70,8 +71,8 @@ namespace ZKEACMS.Controllers
         {
             if (_hostingEnvironment.IsDevelopment())
             {
-                var package = _packageInstallerProvider.CreateInstaller("ThemePackageInstaller").Pack(id) as ThemePackage;
-                return File(package.ToFilePackage(), "Application/zip", package.Theme.Title + ".theme");
+                var package = _packageInstallerProvider.CreateInstaller(ThemePackageInstaller.InstallerName).Pack(id) as ThemePackage;
+                return File(package.ToFilePackage(), "Application/zip", package.Theme.Title + ".wgt");
             }
             return NotFound();
         }
@@ -83,9 +84,12 @@ namespace ZKEACMS.Controllers
             {
                 try
                 {
-                    ThemePackage package;
-                    var installer = _packageInstallerProvider.CreateInstaller(Request.Form.Files[0].OpenReadStream(), out package);
-                    installer.Install(package);
+                    using (Stream stream = Request.Form.Files[0].OpenReadStream())
+                    {
+                        Package package;
+                        var installer = _packageInstallerProvider.CreateInstaller(stream, out package);
+                        installer.Install(package);
+                    }
                 }
                 catch (Exception ex)
                 {

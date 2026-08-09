@@ -5,7 +5,6 @@
 using Easy;
 using Easy.Constant;
 using Easy.Extend;
-using Easy.RepositoryPattern;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
@@ -35,7 +34,7 @@ namespace ZKEACMS.Common.Service
             carouselWidget.CarouselItems.Each(m => m.ActionType = ActionType.Update);
             return carouselWidget;
         }
-        public override ServiceResult<CarouselWidget> Add(CarouselWidget item)
+        public override ErrorOr<CarouselWidget> Add(CarouselWidget item)
         {
             return BeginTransaction(() =>
             {
@@ -45,7 +44,7 @@ namespace ZKEACMS.Common.Service
                     _carouselItemService.BeginBulkSave();
                     item.CarouselItems.Each(m =>
                     {
-                        if (m.ActionType != ActionType.Delete)
+                        if (!m.ActionType.HasFlag(ActionType.Delete))
                         {
                             _carouselItemService.Add(new CarouselItemEntity
                             {
@@ -58,7 +57,7 @@ namespace ZKEACMS.Common.Service
                             });
                         }
                     });
-                    _carouselItemService.SaveChanges();
+                    _carouselItemService.EndBulkSave();
                 }
                 return result;
             });
@@ -77,11 +76,11 @@ namespace ZKEACMS.Common.Service
                     item.CarouselItems.Each(m =>
                     {
                         m.CarouselWidgetID = item.ID;
-                        if (m.ActionType == ActionType.Create)
+                        if (m.ActionType.HasFlag(ActionType.Create))
                         {
                             _carouselItemService.Add(m);
                         }
-                        else if (m.ActionType == ActionType.Delete)
+                        else if (m.ActionType.HasFlag(ActionType.Delete))
                         {
                             if (m.ID > 0)
                             {
@@ -93,7 +92,7 @@ namespace ZKEACMS.Common.Service
                             _carouselItemService.Update(m);
                         }
                     });
-                    _carouselItemService.SaveChanges();
+                    _carouselItemService.EndBulkSave();
                 }
             });
         }
@@ -111,12 +110,30 @@ namespace ZKEACMS.Common.Service
         public override object Display(WidgetDisplayContext widgetDisplayContext)
         {
             var carouselWidget = widgetDisplayContext.Widget as CarouselWidget;
-            if (carouselWidget.CarouselID.HasValue)
+            if (carouselWidget.CarouselItems == null)
             {
-                carouselWidget.CarouselItems = _carouselItemService.Get(m => m.CarouselID == carouselWidget.CarouselID);
+                carouselWidget.CarouselItems = new List<CarouselItemEntity>();
             }
-            carouselWidget.CarouselItems = carouselWidget.CarouselItems.Where(m => m.Status == (int)RecordStatus.Active);
+            if (carouselWidget.CarouselID.HasValue && !carouselWidget.CarouselItems.Any(m => m.CarouselID == carouselWidget.CarouselID))
+            {
+                carouselWidget.CarouselItems = carouselWidget.CarouselItems.Concat(_carouselItemService.Get(m => m.CarouselID == carouselWidget.CarouselID)).ToList();
+            }
+            if (carouselWidget.CarouselItems.Any(m => m.Status != (int)RecordStatus.Active))
+            {
+                carouselWidget.CarouselItems = carouselWidget.CarouselItems.Where(m => m.Status == (int)RecordStatus.Active).ToList();
+            }
             return carouselWidget;
+        }
+
+        protected override IEnumerable<string> GetFilesInWidget(CarouselWidget widget)
+        {
+            var items = widget.CarouselItems;
+            if (items == null) Enumerable.Empty<string>();
+
+            foreach (var item in items)
+            {
+                yield return item.ImageUrl;
+            }
         }
     }
 }

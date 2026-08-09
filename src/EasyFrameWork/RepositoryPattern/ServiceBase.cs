@@ -26,7 +26,7 @@ namespace Easy.RepositoryPattern
         {
             ApplicationContext = applicationContext;
             DbContext = dbContext;
-            isWaitingSave = false;
+            isInBulkSaving = false;
         }
 
         public virtual TdbContext DbContext
@@ -38,7 +38,7 @@ namespace Easy.RepositoryPattern
 
         public IApplicationContext ApplicationContext { get; set; }
 
-        private bool isWaitingSave;
+        private bool isInBulkSaving;
 
         public void BeginTransaction(Action action)
         {
@@ -72,7 +72,7 @@ namespace Easy.RepositoryPattern
                     try
                     {
                         var result = action.Invoke();
-                        if (result is ServiceResult sResult && sResult.HasViolation)
+                        if (result is ErrorOr sResult && sResult.HasError)
                         {
                             transaction.Rollback();
                         }
@@ -94,9 +94,9 @@ namespace Easy.RepositoryPattern
                 return action.Invoke();
             }
         }
-        protected virtual ServiceResult<T> Validate(T item)
+        protected virtual ErrorOr<T> Validate(T item)
         {
-            ServiceResult<T> serviceResult = new ServiceResult<T>();
+            ErrorOr<T> serviceResult = new ErrorOr<T>();
             var entryType = typeof(T);
             var viewConfig = ServiceLocator.GetViewConfigure(typeof(T));
             if (viewConfig != null)
@@ -112,7 +112,7 @@ namespace Easy.RepositoryPattern
                             {
                                 if (!v.Validate(p.GetValue(item)))
                                 {
-                                    serviceResult.RuleViolations.Add(new RuleViolation(p.Name, v.ErrorMessage));
+                                    serviceResult.AddError(p.Name, v.ErrorMessage);
                                 }
                             });
                         }
@@ -123,10 +123,10 @@ namespace Easy.RepositoryPattern
             serviceResult.Result = item;
             return serviceResult;
         }
-        public virtual ServiceResult<T> Add(T item)
+        public virtual ErrorOr<T> Add(T item)
         {
             var result = Validate(item);
-            if (result.HasViolation)
+            if (result.HasError)
             {
                 return result;
             }
@@ -145,19 +145,16 @@ namespace Easy.RepositoryPattern
                 editor.LastUpdateDate = DateTime.Now;
             }
             CurrentDbSet.Add(item);
-            if (!isWaitingSave)
-            {
-                SaveChanges();
-            }
+            SaveChanges();
             return result;
         }
-        public virtual ServiceResult<T> AddRange(params T[] items)
+        public virtual ErrorOr<T> AddRange(params T[] items)
         {
-            ServiceResult<T> result = new ServiceResult<T>();
+            ErrorOr<T> result = new ErrorOr<T>();
             foreach (var item in items)
             {
                 var itemResult = Validate(item);
-                if (itemResult.HasViolation)
+                if (itemResult.HasError)
                 {
                     return itemResult;
                 }
@@ -177,10 +174,7 @@ namespace Easy.RepositoryPattern
                 }
             }
             CurrentDbSet.AddRange(items);
-            if (!isWaitingSave)
-            {
-                SaveChanges();
-            }
+            SaveChanges();
             return result;
         }
 
@@ -290,10 +284,10 @@ namespace Easy.RepositoryPattern
             }
             return await Get().CountAsync();
         }
-        public virtual ServiceResult<T> Update(T item)
+        public virtual ErrorOr<T> Update(T item)
         {
             var result = Validate(item);
-            if (result.HasViolation)
+            if (result.HasError)
             {
                 return result;
             }
@@ -308,18 +302,15 @@ namespace Easy.RepositoryPattern
                 editor.LastUpdateDate = DateTime.Now;
             }
             CurrentDbSet.Update(item);
-            if (!isWaitingSave)
-            {
-                SaveChanges();
-            }
+            SaveChanges();
             return result;
         }
-        public virtual ServiceResult<T> UpdateRange(params T[] items)
+        public virtual ErrorOr<T> UpdateRange(params T[] items)
         {
             foreach (var item in items)
             {
                 var itemResult = Validate(item);
-                if (itemResult.HasViolation)
+                if (itemResult.HasError)
                 {
                     return itemResult;
                 }
@@ -335,11 +326,8 @@ namespace Easy.RepositoryPattern
                 }
             }
             CurrentDbSet.UpdateRange(items);
-            if (!isWaitingSave)
-            {
-                SaveChanges();
-            }
-            return new ServiceResult<T>();
+            SaveChanges();
+            return new ErrorOr<T>();
         }
         public void Remove(params object[] primaryKey)
         {
@@ -352,42 +340,41 @@ namespace Easy.RepositoryPattern
         public virtual void Remove(T item)
         {
             CurrentDbSet.Remove(item);
-            if (!isWaitingSave)
-            {
-                SaveChanges();
-            }
+            SaveChanges();
         }
         public virtual void Remove(Expression<Func<T, bool>> filter)
         {
-            CurrentDbSet.RemoveRange(CurrentDbSet.Where(filter));
-            if (!isWaitingSave)
-            {
-                SaveChanges();
-            }
+            CurrentDbSet.Where(filter).ExecuteDelete();
         }
         public virtual void RemoveRange(params T[] items)
         {
             CurrentDbSet.RemoveRange(items);
-            if (!isWaitingSave)
-            {
-                SaveChanges();
-            }
+            SaveChanges();
         }
         public virtual void Dispose()
         {
             //DbContext.Dispose();
         }
-
-        public virtual void SaveChanges()
+        private void SaveChanges()
         {
-            DbContext.SaveChanges();
-            isWaitingSave = false;
+            if(!isInBulkSaving)
+            {
+                DbContext.SaveChanges();
+                DbContext.ChangeTracker.Clear();
+            }
         }
 
         public virtual void BeginBulkSave()
         {
-            isWaitingSave = true;
+            isInBulkSaving = true;
         }
+
+        public virtual void EndBulkSave()
+        {
+            isInBulkSaving = false;
+            SaveChanges();
+        }
+        
     }
     public abstract class ServiceBase<T> : ServiceBase<T, DbContext>
         where T : class

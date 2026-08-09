@@ -19,16 +19,28 @@ namespace Easy.Constant
     {
         Create = 1,
         Update = 2,
-        Delete = 3,
-        Design = 4,
-        Publish = 5,
-        Unattached = 6,
-        Continue = 7,
-        UnAttach = 8
+        Delete = 4,
+        Design = 8,
+        Publish = 16,
+        Exit = 32,
+        Continue = 64,
+        UnAttach = 128,
+        CreateAndExit = Create | Exit,
+        UpdateAndExit = Update | Exit
     }
     public enum UserType
     {
         Administrator = 1,
         Customer = 2
+    }
+    public enum NameCaseStrategy
+    {
+        None = 0,
+        LowerCase = 1,
+        UpperCase = 2,
+        CamelCase = 3,      // userName
+        PascalCase = 4,     // UserName
+        SnakeCase = 5,      // user_name
+        KebabCase = 6       // user-name
     }
 }

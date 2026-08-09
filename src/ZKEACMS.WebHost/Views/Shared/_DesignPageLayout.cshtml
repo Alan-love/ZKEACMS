@@ -8,52 +8,13 @@
     {
         return;
     }
-    CMSApplicationContext appContext = ApplicationContext as CMSApplicationContext;
+    this.WorkContext().CurrentPage.Title = $"[{L("Design")}]{Model.Page.Title}";
 }
 @inject IOptions<CultureOption> cultureOption
 <!DOCTYPE html>
 <html lang="@cultureOption.Value.Code">
 <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <meta http-equiv="cache-control" content="no-cache">
-    <meta http-equiv="cache-control" content="no-store">
-    <meta http-equiv="expires" content="-1">
-    <meta http-equiv="pragma" content="no-cache" />
-    @if (appContext.OuterChainPicture)
-    {
-        <meta name="referrer" content="same-origin" />
-    }
-    @if (this.WorkContext().EnableResponsiveDesign)
-    {
-        <meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no,maximum-scale=1.0" />
-    }
-    <title>[@L("Design")]@Model.Page.Title</title>
-    <link href="~/favicon.ico" rel="shortcut icon" type="image/x-icon" />
-    @StyleAtHead()
-    @ScriptAtHead()
-    @foreach (var item in appContext.HeaderPart)
-    {
-        @item
-    }
-    @if (!Model.Style.IsNullOrEmpty())
-    {
-        <link href="@Url.Content(Model.Style)" rel="stylesheet" />
-    }
-    @foreach (var style in Model.Page.Styles)
-    {
-        <link href="@Url.Content(style.Url)" rel="stylesheet" />
-    }
-    @if (Model.CurrentTheme != null)
-    {
-        if (ApplicationContext.HostingEnvironment.IsDevelopment())
-        {
-            <link type="text/css" rel="stylesheet" href="@Url.Content(Model.CurrentTheme.UrlDebugger)" />
-        }
-        else
-        {
-            <link type="text/css" rel="stylesheet" href="@Url.Content(Model.CurrentTheme.Url)" />
-        }
-    }
+    @await Html.PartialAsync("Partial.PageHeader")
 </head>
 <body class="front">
     <nav id="toolBar">
@@ -70,26 +31,26 @@
                 </div>
                 <div class="pull-right">
                     <div class="zk-btn-group">
-                        <a class="zk-btn zk-btn-primary" href="@Url.Action("RedirectView", "Page", new {Model.Page.ID})">
+                        <a class="zk-btn zk-btn-primary" href="@Url.Action("RedirectView", "Page", new { Model.Page.ID })">
                             <i class="glyphicon glyphicon-eye-open"></i>
                             @L("Preview")
                         </a>
                         <button class="zk-btn zk-btn-primary mobile-preview" data-toggle="modal" data-target="#mobile-frame">
                             <i class="glyphicon glyphicon-phone"></i>
                         </button>
-                        <a class="zk-btn zk-btn-primary" href="@Url.Action("Index", "Page", new {PageID = Model.Page.ID})">
+                        <a class="zk-btn zk-btn-primary" href="@Url.Action("Index", "Page", new { PageId = Model.Page.ID })">
                             <i class="glyphicon glyphicon-th-list"></i>
                             @L("Overview")
                         </a>
-                        <a class="zk-btn zk-btn-primary" href="@Url.Action("Design", "Layout", new {Model.ID, PageID = Model.Page.ID})">
+                        <a class="zk-btn zk-btn-primary" href="@Url.Action("Design", "Layout", new { Model.ID, PageId = Model.Page.ID })">
                             <i class="glyphicon glyphicon-th"></i>
                             @L("Edit Layout")
                         </a>
-                        <a class="zk-btn zk-btn-primary" href="@Url.Action("Edit", "Page", new { Model.Page.ID})">
+                        <a class="zk-btn zk-btn-primary" href="@Url.Action("Edit", "Page", new { Model.Page.ID })">
                             <i class="glyphicon glyphicon-record"></i>
                             @L("Property/History")
                         </a>
-                        <a class="zk-btn zk-btn-primary" href="@Url.Action("SelectWidget", "WidgetTemplate", new { pageId = Model.Page.ID})">
+                        <a class="zk-btn zk-btn-primary" href="@Url.Action("SelectWidget", "WidgetTemplate", new QueryContext{ PageId = Model.Page.ID })">
                             <i class="glyphicon glyphicon-plus"></i>
                             @L("Add Content")
                         </a>
@@ -97,7 +58,7 @@
                             <i class="glyphicon glyphicon-copy"></i>
                             @L("Upload Section")
                         </a>
-                        <a class="zk-btn zk-btn-primary" href="@Url.Action("PublishPage", "Page", new {Model.Page.ID, ReturnUrl = Model.Page.Url})">
+                        <a class="zk-btn zk-btn-primary" href="@Url.Action("PublishPage", "Page", new { Model.Page.ID, ReturnUrl = Model.Page.Url })">
                             <i class="glyphicon glyphicon-open"></i>
                             @L("Publish")
                         </a>
@@ -142,19 +103,6 @@
             </div>
         </div>
     </div>
-    @StyleAtFoot()
-    @ScriptAtFoot()
-    @if (!Model.Script.IsNullOrEmpty())
-    {
-        <script type="text/javascript" src="@Url.Content(Model.Script)"></script>
-    }
-    @foreach (var script in Model.Page.Scripts)
-    {
-        <script type="text/javascript" src="@Url.Content(script.Url)"></script>
-    }
-    @foreach (var item in appContext.FooterPart)
-    {
-        @item
-    }
+    @await Html.PartialAsync("Partial.PageFooter")
 </body>
 </html>

@@ -12,16 +12,16 @@ using ZKEACMS.Page;
 
 namespace ZKEACMS.Widget
 {
-    public class WidgetChangedTriggerPageEventHandler : IEventHandler
+    public sealed class WidgetChangedTriggerPageEventHandler : IEventHandler
     {
         private readonly IPageService _pageService;
-        private readonly ICacheManager<IEnumerable<WidgetBase>> _pageWidgetCacheManage;
+        private readonly ISignals _signals;
         private readonly HashSet<string> _pages;
-        public WidgetChangedTriggerPageEventHandler(IPageService pageService, ICacheManager<IEnumerable<WidgetBase>> pageWidgetCacheManage)
+        public WidgetChangedTriggerPageEventHandler(IPageService pageService, ISignals signals)
         {
             _pageService = pageService;
-            _pageWidgetCacheManage = pageWidgetCacheManage;
             _pages = new HashSet<string>();
+            _signals = signals;
         }
 
         public WidgetChangedTriggerPageEventHandler(IPageService pageService)
@@ -32,14 +32,14 @@ namespace ZKEACMS.Widget
         public void Handle(object entity, EventArg e)
         {
             WidgetBase widget = entity as WidgetBase;
-            if (widget.PageID.IsNotNullAndWhiteSpace() && !_pages.Contains(widget.PageID))
+            if (widget.PageId.IsNotNullAndWhiteSpace() && !_pages.Contains(widget.PageId))
             {
-                _pages.Add(widget.PageID);
-                _pageService.MarkChanged(widget.PageID);
+                _pages.Add(widget.PageId);
+                _pageService.MarkChanged(widget.PageId);
             }
-            if (widget.LayoutID.IsNotNullAndWhiteSpace())
+            if (widget.LayoutId.IsNotNullAndWhiteSpace())
             {
-                _pageWidgetCacheManage.Clear();
+                _signals.Trigger(CacheSignals.PageWidgetChanged);
             }
         }
     }

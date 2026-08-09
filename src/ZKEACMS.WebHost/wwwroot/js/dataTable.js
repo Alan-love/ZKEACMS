@@ -11,7 +11,7 @@ $(document).ready(function () {
     }
 
     $(".seach-terms .form-control").each(function () {
-        $(this).removeAttr("readonly").removeAttr("disabled");
+        $(this).removeAttr("readonly").removeAttr("disabled").css("pointer-events", "auto");
         if ($(this).is("select")) {
             if ($("option:first", this).val()) {
                 $(this).prepend("<option selected></option>");
@@ -76,6 +76,7 @@ $(document).ready(function () {
         });
         var dataTable = $(this);
         dataTable.DataTable({
+            "responsive":true,
             "autoWidth": false,
             "processing": true,
             "serverSide": true,
@@ -83,7 +84,7 @@ $(document).ready(function () {
             "ajax": {
                 "url": $(this).data("source"),
                 "data": function (data, setting) {
-                    var inputs = dataTable.closest(".grid-component").find(".seach-terms").find(".form-control");
+                    var inputs = dataTable.closest(".grid-component").find(".seach-terms").find("input,select");
                     for (var i = 0; i < inputs.length; i++) {
                         var input = $(inputs[i]);
                         var name = input.attr("name").toLowerCase();

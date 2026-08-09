@@ -15,25 +15,39 @@ using Microsoft.AspNetCore.Hosting;
 using Easy.RepositoryPattern;
 using Easy.Cache;
 using System.IO.Compression;
+using Easy;
 
 namespace ZKEACMS.Common.Service
 {
     public class TemplateService : ITemplateService
     {
-        private readonly IThemeService _themeService;
-        private readonly IWebHostEnvironment _webHostEnvironment;
-        private readonly string _themeName = "themes";
-        private readonly string _viewName = "Views";
-        private readonly string _cshtml = "*.cshtml";
+        protected readonly IThemeService _themeService;
+        protected readonly IWebHostEnvironment _webHostEnvironment;
+        private const string _themeFolderName = "themes";
+        private const string _viewFolderName = "Views";
+        private const string _viewImportsFileName = "_ViewImports.cshtml";
         private readonly string _templateFilesCacheKey = "TemplateFilesCacheKey";
-        private readonly ICacheManager<List<TemplateFile>> _cacheMgr;
-        public TemplateService(IWebHostEnvironment hostingEnvironment, IThemeService themeService, ICacheManager<List<TemplateFile>> cacheManager)
+        private readonly ICacheManager<TemplateService> _cacheMgr;
+        public TemplateService(IWebHostEnvironment hostingEnvironment, IThemeService themeService, ICacheManager<TemplateService> cacheManager)
         {
             _webHostEnvironment = hostingEnvironment;
             _themeService = themeService;
             _cacheMgr = cacheManager;
         }
-        public List<string> GetThemeNames()
+        public virtual string[] GetAvailableTemplates()
+        {
+            List<string> templates = new List<string>();
+            using (ZipArchive archive = ZipFile.OpenRead(Path.Combine(_webHostEnvironment.ContentRootPath, "Templates.zip")))
+            {
+                foreach (ZipArchiveEntry entry in archive.Entries)
+                {
+                    int index = entry.Name.LastIndexOf('.');
+                    templates.Add(entry.Name.Substring(0, index));
+                }
+            }
+            return templates.OrderBy(m => m).ToArray();
+        }
+        public virtual List<string> GetThemeNames()
         {
             List<string> list = new List<string>();
             var themes = _themeService.GetAllThemes();
@@ -41,7 +55,7 @@ namespace ZKEACMS.Common.Service
             {
                 foreach (var item in themes)
                 {
-                    string path = _webHostEnvironment.MapWebRootPath(_themeName, item.ID);
+                    string path = _webHostEnvironment.MapPath(_themeFolderName, item.ID);
                     if (ExtFile.ExistDirectory(path))
                     {
                         list.Add(item.ID);
@@ -51,7 +65,12 @@ namespace ZKEACMS.Common.Service
             return list;
         }
 
-        public TemplateFile Get(int id)
+        protected virtual string[] GetSupportFileExtensions()
+        {
+            return new string[] { ".cshtml" };
+        }
+
+        public virtual TemplateFile Get(int id)
         {
             List<TemplateFile> templateFiles = GetTemplateFiles();
             var file = templateFiles.FirstOrDefault(m => m.Id == id);
@@ -59,48 +78,66 @@ namespace ZKEACMS.Common.Service
             return file;
         }
 
-        public TemplateFile GetDefaultTemplateFile(string templateName)
+        public virtual TemplateFile GetDefaultTemplateFile(string templateName)
         {
             var theme = _themeService.GetCurrentTheme();
             string themeName = theme?.ID;
-            string[] paths = new string[] { "~", _themeName, themeName, _viewName, "" };
-            TemplateFile model = new TemplateFile()
+            TemplateFile model = new TemplateFile
             {
                 ThemeName = themeName,
-                RelativePath = string.Join("/", paths),
-                LastUpdateTime = DateTime.Now
+                LastUpdateTime = DateTime.Now,
+                ThemeViewsFolder = GetThemeViewsFolder(themeName)
             };
             if (templateName.IsNotNullAndWhiteSpace())
             {
-                model.RelativePath += templateName;
-                model.Name = templateName;
-                using (ZipArchive archive = ZipFile.OpenRead(Path.Combine(_webHostEnvironment.ContentRootPath, "Templates.zip")))
+                foreach (var extension in GetSupportFileExtensions())
                 {
-                    foreach (ZipArchiveEntry entry in archive.Entries)
+                    string fileName = $"{templateName}{extension}";
+                    model.RelativePath = string.Join("/", "~", _themeFolderName, themeName, _viewFolderName, fileName);
+                    model.Name = fileName;
+                    model.Content = GetTemplateContent(fileName);
+                    if (model.Content.IsNotNullAndWhiteSpace())
                     {
-                        if (entry.Name == templateName)
-                        {
-                            using (StreamReader reader = new StreamReader(entry.Open()))
-                            {
-                                model.Content = reader.ReadToEnd();
-                            }
-                            break;
-                        }
+                        break;
                     }
                 }
+            }
+            else
+            {
+                string newTemplateName = "NewTemplate" + GetSupportFileExtensions().FirstOrDefault();
+                model.RelativePath = string.Join("/", "~", _themeFolderName, themeName, _viewFolderName, newTemplateName);
+                model.Name = newTemplateName;
             }
             return model;
         }
 
-        public ServiceResult<TemplateFile> CreateOrUpdate(TemplateFile model)
+        protected virtual string GetTemplateContent(string templateName)
+        {
+            using (ZipArchive archive = ZipFile.OpenRead(Path.Combine(_webHostEnvironment.ContentRootPath, "Templates.zip")))
+            {
+                foreach (ZipArchiveEntry entry in archive.Entries)
+                {
+                    if (entry.Name == templateName)
+                    {
+                        using (StreamReader reader = new StreamReader(entry.Open()))
+                        {
+                            return reader.ReadToEnd();
+                        }
+                    }
+                }
+            }
+            return string.Empty;
+        }
+
+        public virtual ErrorOr<TemplateFile> CreateOrUpdate(TemplateFile model)
         {
             string name = model.Name;
             string relativePath = model.RelativePath;
-            ServiceResult<TemplateFile> result = new ServiceResult<TemplateFile>();
-            if (name.EndsWith(_cshtml.Substring(1)))
+            string ext = Path.GetExtension(name);
+            if (GetSupportFileExtensions().Contains(ext))
             {
                 relativePath = relativePath.TrimStart('~');
-                model.Path = _webHostEnvironment.MapWebRootPath(relativePath.Split('/'));
+                model.Path = _webHostEnvironment.MapPath(relativePath.Split('/'));
                 if (model.Id > 0)
                 {
                     var old = Get(model.Id);
@@ -110,20 +147,20 @@ namespace ZKEACMS.Common.Service
                     }
                 }
                 ExtFile.WriteFile(model.Path, model.Content);
+                EnsureHasViewImports(model.Path);
                 _cacheMgr.Remove(_templateFilesCacheKey);
-                result.Result = GetTemplateFiles().First(m => m.RelativePath == model.RelativePath);
+                return new ErrorOr<TemplateFile>(GetTemplateFiles().First(m => m.RelativePath == model.RelativePath));
             }
             else
             {
-                result.RuleViolations.Add(new RuleViolation("Name", "File not support"));
+                return new Error("Name", "File not support");
             }
-            return result;
         }
 
         public void Delete(int id)
         {
             var model = Get(id);
-            if (model.Name != "_ViewImports.cshtml")
+            if (model.Name != _viewImportsFileName)
             {
                 ExtFile.DeleteFile(model.Path);
                 _cacheMgr.Remove(_templateFilesCacheKey);
@@ -149,48 +186,102 @@ namespace ZKEACMS.Common.Service
 
         private List<TemplateFile> GetTemplateFiles()
         {
-            return _cacheMgr.GetOrAdd(_templateFilesCacheKey, key =>
+            return _cacheMgr.GetOrCreate(_templateFilesCacheKey, factory =>
             {
-                var templateFiles = new List<TemplateFile>();
+                var allTemplateFiles = new List<TemplateFile>();
                 List<string> themes = GetThemeNames();
 
-                Dictionary<string, List<string>> dic = new Dictionary<string, List<string>>();
-                foreach (var item in themes)
+                Dictionary<string, List<string>> themeTemplateFiles = new Dictionary<string, List<string>>();
+                foreach (var theme in themes)
                 {
-                    List<string> temFiles = new List<string>();
-                    string path = _webHostEnvironment.MapWebRootPath(_themeName, item, _viewName);
-                    var fs = ExtFile.GetFiles(path, _cshtml);
-                    if (fs != null && fs.Length > 0) temFiles.AddRange(fs);
-                    dic.Add(item, temFiles);
+                    List<string> templateFiles = new List<string>();
+                    string path = _webHostEnvironment.MapPath(_themeFolderName, theme, _viewFolderName);
+                    foreach (var extension in GetSupportFileExtensions())
+                    {
+                        var fs = ExtFile.GetFiles(path, "*" + extension);
+                        if (fs != null && fs.Length > 0) templateFiles.AddRange(fs);
+                    }
+                    themeTemplateFiles.Add(theme, templateFiles);
                 }
 
                 int index = _webHostEnvironment.WebRootPath.Length;
                 int id = 0;
-                foreach (var d in dic)
+                foreach (var theme in themeTemplateFiles)
                 {
-                    foreach (var item in d.Value)
+                    foreach (var item in theme.Value)
                     {
-                        TemplateFile file = new TemplateFile()
+                        TemplateFile file = new TemplateFile
                         {
                             Id = ++id,
-                            ThemeName = d.Key,
+                            ThemeName = theme.Key,
+                            ThemeViewsFolder = GetThemeViewsFolder(theme.Key),
                             Name = Path.GetFileName(item),
                             Path = item,
                             RelativePath = GetRelativePath(item, index),
                             LastUpdateTime = File.GetLastWriteTime(item)
                         };
-                        templateFiles.Add(file);
+                        allTemplateFiles.Add(file);
                     }
                 }
-                return templateFiles;
+                return allTemplateFiles;
             });
         }
-
+        protected virtual string GetThemeViewsFolder(string themeName)
+        {
+            return string.Join("/", "~", _themeFolderName, themeName, _viewFolderName);
+        }
         private string GetRelativePath(string path, int len)
         {
             string p = path.Substring(len);
             p = p.Replace("\\", "/");
             return "~" + p;
+        }
+
+        public static void EnsureHasViewImports(string viewPath, params string[] addtionalUsing)
+        {
+            if (!viewPath.EndsWith(".cshtml")) return;
+
+            FileInfo fileInfo = new FileInfo(viewPath);
+            DirectoryInfo viewsFolder = fileInfo.Directory;
+            while (!viewsFolder.Name.Equals(_viewFolderName))
+            {
+                viewsFolder = viewsFolder.Parent;
+            }
+            string viewImportsFile = Path.Combine(viewsFolder.FullName, _viewImportsFileName);
+            if (File.Exists(viewImportsFile)) return;
+
+            using (FileStream fs = new FileStream(viewImportsFile, FileMode.Create, FileAccess.ReadWrite))
+            {
+                using (StreamWriter writer = new StreamWriter(fs, Encoding.UTF8))
+                {
+                    writer.WriteLine("@inherits Easy.Mvc.RazorPages.EasyRazorPage<TModel>");
+                    writer.WriteLine("@using Easy.Extend");
+                    writer.WriteLine("@using Easy.Mvc.Extend");
+                    writer.WriteLine("@using ZKEACMS");
+                    writer.WriteLine("@using ZKEACMS.Common.Service");
+                    writer.WriteLine("@using ZKEACMS.Dashboard");
+                    writer.WriteLine("@using ZKEACMS.DataArchived");
+                    writer.WriteLine("@using ZKEACMS.ExtendField");
+                    writer.WriteLine("@using ZKEACMS.Layout");
+                    writer.WriteLine("@using ZKEACMS.Media");
+                    writer.WriteLine("@using ZKEACMS.Page");
+                    writer.WriteLine("@using ZKEACMS.Setting");
+                    writer.WriteLine("@using ZKEACMS.Theme");
+                    writer.WriteLine("@using ZKEACMS.Widget");
+                    writer.WriteLine("@using ZKEACMS.WidgetTemplate");
+                    writer.WriteLine("@using ZKEACMS.Zone");
+                    writer.WriteLine("@using Easy.Constant");
+                    if(addtionalUsing != null)
+                    {
+                        foreach (var item in addtionalUsing)
+                        {
+                            writer.WriteLine(item);
+                        }
+                    }
+                    writer.WriteLine("@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers");
+                    writer.WriteLine("@addTagHelper *, EasyFrameWork");
+                }
+            }
         }
     }
 }

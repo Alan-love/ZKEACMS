@@ -155,7 +155,7 @@ namespace Easy.ViewPort.Descriptor
             Dictionary<string, object> result = new Dictionary<string, object>();
             const string formControl = "form-control";
             const string required = "required";
-            if (!Classes.Contains(formControl))
+            if (!Classes.Contains(formControl) && TagType != HTMLEnumerate.HTMLTagTypes.CheckBox)
             {
                 Classes.Add(formControl);
             }
@@ -182,59 +182,35 @@ namespace Easy.ViewPort.Descriptor
 
         private string GetLocalize(string key)
         {
-            var languageService = ServiceLocator.GetService<ILanguageService>();
             var localize = ServiceLocator.GetService<ILocalize>();
-            var cultureOption = ServiceLocator.GetService<IOptions<CultureOption>>();
             var translated = localize.GetOrNull(key);
 
-            if (translated == null)
-            {
-                if (key.Contains("@"))
-                {
-                    string property = key.Split('@')[1];
-                    translated = localize.GetOrNull(property);
-                    if (translated == null)
-                    {
-                        StringBuilder lanValueBuilder = new StringBuilder();
-                        if (property.Length > 2 && (property.EndsWith("ID") || property.EndsWith("Id")))
-                        {
-                            property = property.Substring(0, property.Length - 2);
-                        }
-                        if (property.Length > 2)
-                        {
-                            for (int i = 0; i < property.Length; i++)
-                            {
-                                char charLan = property[i];
-                                if (i > 0 && char.IsUpper(charLan))
-                                {
-                                    lanValueBuilder.Append(' ');
-                                }
-                                lanValueBuilder.Append(charLan);
-                            }
-                            property = lanValueBuilder.ToString();
-                        }
-                    }
-                    else
-                    {
-                        property = translated;
-                    }
-                    languageService.Add(new LanguageEntity
-                    {
-                        CultureName = cultureOption.Value.Code,
-                        LanValue = property,
-                        LanKey = key,
-                        LanType = "EntityProperty",
-                        Module = key.Split('@')[0]
-                    });
-                    return property;
-                }
-                else
-                {
-                    return key;
-                }
+            if (translated.IsNotNullAndWhiteSpace()) return translated;
+            if (!key.Contains("@")) return key;
 
+            string property = key.Split('@')[1];
+            translated = localize.GetOrNull(property);
+            if (translated.IsNotNullAndWhiteSpace()) return translated;
+
+            if (property.Length <= 2) return property;
+
+            if (property.EndsWith("ID") || property.EndsWith("Id"))
+            {
+                property = property.Substring(0, property.Length - 2);
             }
-            return translated;
+            if (property.Length <= 2) return property;
+
+            StringBuilder lanValueBuilder = new StringBuilder();
+            for (int i = 0; i < property.Length; i++)
+            {
+                char charLan = property[i];
+                if (i > 0 && i < (property.Length - 1) && char.IsUpper(charLan) && !char.IsUpper(property[i + 1]))
+                {
+                    lanValueBuilder.Append(' ');
+                }
+                lanValueBuilder.Append(charLan);
+            }
+            return lanValueBuilder.ToString();
         }
     }
 
@@ -276,9 +252,7 @@ namespace Easy.ViewPort.Descriptor
         }
         public T AddProperty(string property, string value)
         {
-            if (this.Properties.ContainsKey(property))
-                this.Properties[property] = value;
-            else this.Properties.Add(property, value);
+            this.Properties[property] = value;
             return this as T;
         }
         public T AddClass(string name)
@@ -290,36 +264,16 @@ namespace Easy.ViewPort.Descriptor
 
         public T ReadOnly()
         {
-            if (!this.Properties.ContainsKey("readonly"))
-            {
-                this.Properties.Add("readonly", "readonly");
-            }
-            else
-            {
-                this.Properties["readonly"] = "readonly";
-            }
-            if (!this.Properties.ContainsKey("unselectable"))
-            {
-                this.Properties.Add("unselectable", "on");
-            }
-            else
-            {
-                this.Properties["unselectable"] = "on";
-            }
+            this.Properties["readonly"] = "readonly";
+            this.Properties["unselectable"] = "on";
+            this.AddStyle("pointer-events", "none");
             this.IsReadOnly = true;
             return this as T;
         }
 
         public T AddStyle(string properyt, string value)
         {
-            if (this.Styles.ContainsKey(properyt))
-            {
-                this.Styles[properyt] = value;
-            }
-            else
-            {
-                this.Styles.Add(properyt, value);
-            }
+            this.Styles[properyt] = value;
             return this as T;
         }
         public T Hide()

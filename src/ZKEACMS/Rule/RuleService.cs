@@ -11,9 +11,10 @@ using System.Text;
 using Easy.Extend;
 using ZKEACMS.Extend;
 using System.Linq;
-using Newtonsoft.Json;
 using ZKEACMS.Widget;
 using Easy.RuleEngine;
+using Easy.Serializer;
+using Easy.AuditTrail;
 
 namespace ZKEACMS.Rule
 {
@@ -23,22 +24,25 @@ namespace ZKEACMS.Rule
         private readonly IWidgetActivator _widgetActivator;
         private readonly IRuleManager _ruleManager;
         private readonly ILocalize _localize;
+        private readonly IAuditTrailService _auditTrailService;
         public RuleService(IApplicationContext applicationContext,
             IWidgetBasePartService widgetBasePartService,
             IWidgetActivator widgetActivator, IRuleManager
             ruleManager, CMSDbContext dbContext,
-            ILocalize localize)
+            ILocalize localize, 
+            IAuditTrailService auditTrailService)
             : base(applicationContext, dbContext)
         {
             _widgetBasePartService = widgetBasePartService;
             _widgetActivator = widgetActivator;
             _ruleManager = ruleManager;
             _localize = localize;
+            _auditTrailService = auditTrailService;
         }
         private Rule Init(Rule item)
         {
             item.RuleItemList = item.RuleItemList.RemoveDeletedItems().ToList();
-            item.RuleItems = JsonConvert.SerializeObject(item.RuleItemList);
+            item.RuleItems = JsonConverter.Serialize(item.RuleItemList);
             StringBuilder expressionBuilder = new StringBuilder();
             foreach (var ruleItem in item.RuleItemList)
             {
@@ -74,7 +78,7 @@ namespace ZKEACMS.Rule
             }
             return string.Format("'{0}'", value.Replace("\\", "\\\\").Replace("'", "\\'"));
         }
-        public override ServiceResult<Rule> Add(Rule item)
+        public override ErrorOr<Rule> Add(Rule item)
         {
             item = Init(item);
             try
@@ -83,13 +87,11 @@ namespace ZKEACMS.Rule
             }
             catch
             {
-                var result = new ServiceResult<Rule>();
-                result.RuleViolations.Add(new RuleViolation("Title", _localize.Get("There is an error value in the condition, save failed!")));
-                return result;
+                return new Error("Title", _localize.Get("There is an error value in the condition, save failed!"));
             }
             return base.Add(item);
         }
-        public override ServiceResult<Rule> Update(Rule item)
+        public override ErrorOr<Rule> Update(Rule item)
         {
             item = Init(item);
             try
@@ -98,10 +100,9 @@ namespace ZKEACMS.Rule
             }
             catch
             {
-                var result = new ServiceResult<Rule>();
-                result.RuleViolations.Add(new RuleViolation("Title", _localize.Get("There is an error value in the condition, save failed!")));
-                return result;
+                return new Error("Title", _localize.Get("There is an error value in the condition, save failed!"));
             }
+            _auditTrailService.AuditUpdate(Get(item.RuleID), item);
             return base.Update(item);
         }
         public override Rule Get(params object[] primaryKey)
@@ -109,7 +110,7 @@ namespace ZKEACMS.Rule
             var rule = base.Get(primaryKey);
             if (rule.RuleItems.IsNotNullAndWhiteSpace())
             {
-                rule.RuleItemList = JsonConvert.DeserializeObject<List<RuleItem>>(rule.RuleItems);
+                rule.RuleItemList = JsonConverter.Deserialize<List<RuleItem>>(rule.RuleItems);
             }
             return rule;
         }

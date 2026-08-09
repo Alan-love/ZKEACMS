@@ -5,10 +5,8 @@
 using Easy;
 using Easy.Extend;
 using Easy.RepositoryPattern;
-using Easy.Zip;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -20,6 +18,8 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using ZKEACMS.Event;
 using ZKEACMS.Page;
+using ZKEACMS.PackageManger;
+using AngleSharp;
 
 namespace ZKEACMS.Widget
 {
@@ -37,7 +37,7 @@ namespace ZKEACMS.Widget
         {
             return CurrentDbSet.AsNoTracking();
         }
-        public override ServiceResult<T> Add(T item)
+        public override ErrorOr<T> Add(T item)
         {
             return BeginTransaction(() =>
              {
@@ -45,12 +45,12 @@ namespace ZKEACMS.Widget
                  var basePart = item.ToWidgetBasePart();
                  basePart.ID = id;
                  var baseResult = WidgetBasePartService.Add(basePart);
-                 if (baseResult.HasViolation)
+                 if (baseResult.HasError)
                  {
-                     ServiceResult<T> result = new ServiceResult<T>();
-                     foreach (var item in baseResult.RuleViolations)
+                     var result = new ErrorOr<T>();
+                     foreach (var item in baseResult.Errors)
                      {
-                         result.AddRuleViolation(item.ParameterName, item.ErrorMessage);
+                         result.AddError(item.ParameterName, item.Message);
                      }
                      return result;
                  }
@@ -59,26 +59,26 @@ namespace ZKEACMS.Widget
              });
         }
 
-        public override ServiceResult<T> Update(T item)
+        public override ErrorOr<T> Update(T item)
         {
             return BeginTransaction(() =>
              {
                  var basePart = WidgetBasePartService.Get(item.ID);
                  item.CopyTo(basePart);
                  var baseResult = WidgetBasePartService.Update(basePart);
-                 if (baseResult.HasViolation)
+                 if (baseResult.HasError)
                  {
-                     ServiceResult<T> result = new ServiceResult<T>();
-                     foreach (var item in baseResult.RuleViolations)
+                     var result = new ErrorOr<T>();
+                     foreach (var item in baseResult.Errors)
                      {
-                         result.AddRuleViolation(item.ParameterName, item.ErrorMessage);
+                         result.AddError(item.ParameterName, item.Message);
                      }
                      return result;
                  }
                  return base.Update(item);
              });
         }
-        public override ServiceResult<T> UpdateRange(params T[] items)
+        public override ErrorOr<T> UpdateRange(params T[] items)
         {
             var ids = items.Select(m => m.ID).ToArray();
             var baseParts = WidgetBasePartService.Get(m => ids.Contains(m.ID));
@@ -90,12 +90,12 @@ namespace ZKEACMS.Widget
             return BeginTransaction(() =>
              {
                  var baseResult = WidgetBasePartService.UpdateRange(baseParts.ToArray());
-                 if (baseResult.HasViolation)
+                 if (baseResult.HasError)
                  {
-                     ServiceResult<T> result = new ServiceResult<T>();
-                     foreach (var item in baseResult.RuleViolations)
+                     var result = new ErrorOr<T>();
+                     foreach (var item in baseResult.Errors)
                      {
-                         result.AddRuleViolation(item.ParameterName, item.ErrorMessage);
+                         result.AddError(item.ParameterName, item.Message);
                      }
                      return result;
                  }
@@ -236,31 +236,78 @@ namespace ZKEACMS.Widget
             widget.IsTemplate = false;
             widget.IsSystem = false;
             var publishResult = Add((T)widget);
-            if (publishResult.HasViolation) throw new Exception(widget.WidgetName + " " + publishResult.ErrorMessage);
+            if (publishResult.HasError) throw new Exception(widget.WidgetName + " " + publishResult.ErrorMessage);
         }
 
         #region PackWidget
         public virtual WidgetPackage PackWidget(WidgetBase widget)
         {
-            widget = GetWidget(widget);
-            widget.PageID = null;
-            widget.LayoutID = null;
-            widget.ZoneID = null;
+            widget.PageId = null;
+            widget.LayoutId = null;
+            widget.ZoneId = null;
             widget.IsSystem = false;
             widget.IsTemplate = true;
-            return new WidgetPackageInstaller(ApplicationContext.HostingEnvironment).Pack(widget) as WidgetPackage;
+            var package = new WidgetPackage(WidgetPackageInstaller.InstallerName)
+            {
+                Widget = widget
+            };
+            var images = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                widget.Thumbnail
+            };
+            AddFileToPackage(package, widget.Thumbnail);
+            foreach (var item in GetFilesInWidget((T)widget))
+            {
+                if (item.IsNullOrWhiteSpace()) continue;
+                if (images.Contains(item)) continue;
+
+                images.Add(item);
+                AddFileToPackage(package, item);
+            }
+            return package;
+        }
+
+        protected virtual IEnumerable<string> GetFilesInWidget(T widget)
+        {
+            return Enumerable.Empty<string>();
+        }
+
+        private void AddFileToPackage(WidgetPackage package, string filePath)
+        {
+            if (!IsLocalFile(filePath)) return;
+
+            string physicalPath = ApplicationContext.HostingEnvironment.MapPath(filePath);
+            var fileInfo = new System.IO.FileInfo(physicalPath);
+            if (!fileInfo.Exists) return;
+
+            package.Files.Add(new PackageManger.FileInfo
+            {
+                FilePath = filePath,
+                FileName = fileInfo.Name,
+                Content = fileInfo.ReadAllBytes()
+            });
+        }
+
+        private static bool IsLocalFile(string filePath)
+        {
+            return filePath.IsNotNullAndWhiteSpace() && (filePath.StartsWith("~/") || filePath.StartsWith("/"));
         }
 
         public virtual void InstallWidget(WidgetPackage pack)
         {
-            var widget = new WidgetPackageInstaller(ApplicationContext.HostingEnvironment).Install(pack);
+            var widget = pack.Widget;
             if (widget != null)
             {
-                (widget as WidgetBase).Description = "Install";
-                AddWidget(widget as WidgetBase);
+                new FilePackageInstaller(ApplicationContext.HostingEnvironment).Install(pack);
+                widget.Description = "Install";
+                AddWidget(widget);
             }
-
         }
         #endregion
+
+        protected HashSet<string> ParseHtmlImageUrls(string html)
+        {
+            return HtmlHelper.ParseImageUrls(html);
+        }
     }
 }

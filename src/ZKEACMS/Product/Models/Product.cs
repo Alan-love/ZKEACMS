@@ -40,7 +40,7 @@ namespace ZKEACMS.Product.Models
         /// <summary>
         /// 类别
         /// </summary>
-        public int ProductCategoryID { get; set; }
+        public int? ProductCategoryID { get; set; }
 
         public string PartNumber { get; set; }
         /// <summary>
@@ -100,24 +100,24 @@ namespace ZKEACMS.Product.Models
             ViewConfig(m => m.TargetFrom).AsHidden();
             ViewConfig(m => m.TargetUrl).AsHidden();
             ViewConfig(m => m.Title).AsTextBox().Required().Order(0).ShowInGrid().Search(Query.Operators.Contains);
-            ViewConfig(m => m.Url).AsTextBox().Order(1).MaxLength(100).UrlPart().Required();
+            ViewConfig(m => m.Url).AsTextBox().Order(1).MaxLength(100).UrlPart().Required().RandomText();
             ViewConfig(m => m.ImageUrl).AsTextBox().Required().MediaSelector();
             ViewConfig(m => m.ImageThumbUrl).AsTextBox().Required().MediaSelector();
             ViewConfig(m => m.PartNumber).AsTextBox().ShowInGrid().Search(Query.Operators.Contains);
             ViewConfig(m => m.BrandCD).AsHidden();
             ViewConfig(m => m.ProductCategoryID)
-                .AsDropDownList()
-                .Required()
+                .AsDropDownTree("GetProductCategoryTree", "ProductCategory", "admin")
                 .DataSource(ViewDataKeys.ProductCategory, SourceType.ViewData)
-                .SetTemplate("ProductCategoryTree")
+                .Required()
                 .ShowInGrid();
 
             ViewConfig(m => m.ProductTags).AsTextBox().SetTemplate("TagSelector");
             ViewConfig(m => m.ProductImages).AsListEditor();
 
             ViewConfig(m => m.ProductContent).AsTextArea().AddClass("html");
+            ViewConfig(m => m.PublishDate).AsTextBox().FormatAsDateTime();
+            ViewConfig(m => m.IsPublish).AsCheckBox().ShowInGrid();
             ViewConfig(m => m.Description).AsTextArea();
-            ViewConfig(m => m.IsPublish).AsTextBox().Hide();
         }
     }
 

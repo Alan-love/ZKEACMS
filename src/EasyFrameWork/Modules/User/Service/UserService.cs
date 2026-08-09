@@ -1,4 +1,5 @@
 /* http://www.zkea.net/ Copyright 2016 ZKEASOFT http://www.zkea.net/licenses */
+using Easy.AuditTrail;
 using Easy.Constant;
 using Easy.Extend;
 using Easy.Modules.User.Models;
@@ -15,12 +16,15 @@ namespace Easy.Modules.User.Service
     public class UserService : ServiceBase<UserEntity, EasyDbContext>, IUserService
     {
         private ILocalize _localize;
-        public UserService(IApplicationContext applicationContext, 
+        private IAuditTrailService _auditTrailService;
+        public UserService(IApplicationContext applicationContext,
             ILocalize localize,
-            EasyDbContext easyDbContext) 
+            EasyDbContext easyDbContext,
+            IAuditTrailService auditTrailService)
             : base(applicationContext, easyDbContext)
         {
             _localize = localize;
+            _auditTrailService = auditTrailService;
         }
         public override DbSet<UserEntity> CurrentDbSet
         {
@@ -55,7 +59,7 @@ namespace Easy.Modules.User.Service
             }
             return passWord;
         }
-        public override ServiceResult<UserEntity> Add(UserEntity item)
+        public override ErrorOr<UserEntity> Add(UserEntity item)
         {
             if (item.UserID.IsNullOrEmpty() && item.Email.IsNotNullAndWhiteSpace())
             {
@@ -82,14 +86,14 @@ namespace Easy.Modules.User.Service
                 throw new Exception(_localize.Get("{0} is already exists").FormatWith(item.Email));
             }
             var result = base.Add(item);
-            if (!result.HasViolation)
+            if (!result.HasError)
             {
                 if (item.Roles != null)
                 {
                     item.Roles.Each(m =>
                     {
                         m.UserID = item.UserID;
-                        if (m.ActionType == ActionType.Create)
+                        if (m.ActionType.HasFlag(ActionType.Create))
                         {
                             DbContext.UserRoleRelation.Add(m);
                         }
@@ -100,7 +104,7 @@ namespace Easy.Modules.User.Service
             return result;
         }
 
-        public override ServiceResult<UserEntity> Update(UserEntity item)
+        public override ErrorOr<UserEntity> Update(UserEntity item)
         {
             if (item.PassWordNew.IsNotNullAndWhiteSpace())
             {
@@ -111,15 +115,15 @@ namespace Easy.Modules.User.Service
                 item.Roles.Each(m =>
                 {
                     m.UserID = item.UserID;
-                    if (m.ActionType == ActionType.Create)
+                    if (m.ActionType.HasFlag(ActionType.Create))
                     {
                         DbContext.UserRoleRelation.Add(m);
                     }
-                    else if (m.ID > 0 && m.ActionType == ActionType.Delete)
+                    else if (m.ID > 0 && m.ActionType.HasFlag(ActionType.Delete))
                     {
                         DbContext.UserRoleRelation.Remove(m);
                     }
-                    else if (m.ActionType == ActionType.Update)
+                    else if (m.ActionType.HasFlag(ActionType.Update))
                     {
                         DbContext.UserRoleRelation.Update(m);
                     }
@@ -129,8 +133,12 @@ namespace Easy.Modules.User.Service
             {
                 throw new Exception(_localize.Get("{0} is already exists").FormatWith(item.Email));
             }
-
+            var existingUser = item.NeedAudit() ? Get(item.UserID) : null;
             var result = base.Update(item);
+            if (existingUser != null && result.IsSuccess)
+            {
+                _auditTrailService.AuditUpdate(existingUser, Get(item.UserID));
+            }
             return result;
         }
 

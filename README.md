@@ -1,6 +1,6 @@
 [![Auto Build](https://github.com/SeriaWei/ZKEACMS/actions/workflows/build.yml/badge.svg)](https://github.com/SeriaWei/ZKEACMS/actions/workflows/build.yml)
 
-# ZKEACMS Build With .Net 5
+# ZKEACMS Build With .Net 9
 
 ZKEACMS is a visual design, **WYSIWYG** Content Management System.
 
@@ -21,7 +21,9 @@ Try it on our demo site:
 
 **Create Page**
 
-[http://www.zkea.net/zkeacms/createpage](http://www.zkea.net/zkeacms/createpage)
+How to create a new page:
+
+[http://www.zkea.net/zkeacms/videos/view/create-page.html](http://www.zkea.net/zkeacms/videos/view/create-page.html)
 
 **Multi-tenant demo**
 
@@ -36,6 +38,9 @@ Change the culture code to `en-US` to use english in `appsettings.json`
 }
 ```
 ## Publish / Release
+|Nuget|Version|
+|---|---|
+|ZKEACMS.Publisher|[![NuGet Badge](https://buildstats.info/nuget/ZKEACMS.Publisher?includePreReleases=true)](https://www.nuget.org/packages/ZKEACMS.Publisher)|
 
 Use `Publish.cmd` or `Publish.sh` to publish the project.
 You can also use the command line below to publish:
@@ -53,13 +58,13 @@ $ ./src/ZKEACMS.WebHost/publish-zkeacms -r win-x64
 ## Run on Docker
 https://hub.docker.com/r/zkeasoft/zkeacms
 ```
-$ docker run -d -p 5000:80 zkeasoft/zkeacms:ent
+$ docker run -d -p 5000:8080 zkeasoft/zkeacms:ent
 ```
 
 ## Development
-* [.Net SDK 5](https://dotnet.microsoft.com/download)
-* Microsoft Sql Server 2012+ / MySql 5.6+ / SQLite 3
-* Microsoft Visual Studio 2019 / Visual Studio Code
+* [.Net 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0)
+* Microsoft Sql Server 2016+ / MySql 5.6+ / SQLite 3
+* Microsoft Visual Studio 2022 / Visual Studio Code
 
 ## Responsive Design
 ZKEACMS is featuring a modern responsive design that automatically adapts to different screen sizes and devices. From the PC, laptop, TV, tablet to the phone page will automatically adapt to adapt.
@@ -85,16 +90,6 @@ The theme is base on Boorstrap.
 
 ## Videos
 [http://www.zkea.net/zkeacms/videos](http://www.zkea.net/zkeacms/videos)
-
-**Enterprise Edition**
-
-The following videos can help you to know the Enterprise Edition:
-
-- https://v.vuevideo.net/share/post/5481323210292563522 
-- https://v.vuevideo.net/share/post/-639458500689997299
-- https://v.vuevideo.net/share/post/7761412908248591201 
-- https://v.vuevideo.net/share/post/2774403749855987239 
-- https://v.vuevideo.net/share/post/779279774519648270 
 
 
 ## Official Website

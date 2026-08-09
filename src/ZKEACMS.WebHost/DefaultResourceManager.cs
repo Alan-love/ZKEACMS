@@ -54,8 +54,8 @@ namespace ZKEACMS.WebHost
                 .Include($"{ScriptPath}/PageDesign.js", $"{ScriptPath}/PageDesign.min.js");
 
             script("admin")
-                .Include($"{ScriptPath}/admin.js", $"{ScriptPath}/admin.min.js")
-                .Include($"{LibraryPath}/smooth-scrollbar/dist/smooth-scrollbar.js");
+                .Include($"{LibraryPath}/smooth-scrollbar/dist/smooth-scrollbar.js")
+                .Include($"{ScriptPath}/admin.js", $"{ScriptPath}/admin.min.js");
 
             script("smooth-scrollbar")
                 .Include($"{LibraryPath}/smooth-scrollbar/dist/smooth-scrollbar.js");
@@ -67,6 +67,8 @@ namespace ZKEACMS.WebHost
             script("dataTable")
                 .Include($"{LibraryPath}/datatables/media/js/jquery.dataTables.js", $"{LibraryPath}/datatables/media/js/jquery.dataTables.min.js")
                 .Include($"{LibraryPath}/datatables/media/js/dataTables.bootstrap.js", $"{LibraryPath}/datatables/media/js/dataTables.bootstrap.min.js")
+                .Include($"{LibraryPath}/datatables/media/js/dataTables.responsive.js", $"{LibraryPath}/datatables/media/js/dataTables.responsive.min.js")
+                .Include($"{LibraryPath}/datatables/media/js/responsive.bootstrap.js", $"{LibraryPath}/datatables/media/js/responsive.bootstrap.min.js")
                 .Include($"{ScriptPath}/moment.js", $"{ScriptPath}/moment.min.js")
                 .Include($"{ScriptPath}/dataTable.js", $"{ScriptPath}/dataTable.min.js");
 
@@ -86,17 +88,6 @@ namespace ZKEACMS.WebHost
             script("image-viewer")
                 .Include($"{ScriptPath}/cimageviewer.min.js");
 
-            script("codemirror").Include($"{LibraryPath}/codemirror/lib/codemirror.js")
-                .Include($"{LibraryPath}/codemirror/addon/edit/closetag.js")
-                .Include($"{LibraryPath}/codemirror/addon/hint/show-hint.js")
-                .Include($"{LibraryPath}/codemirror/addon/hint/xml-hint.js")
-                .Include($"{LibraryPath}/codemirror/addon/hint/html-hint.js")
-                .Include($"{LibraryPath}/codemirror/mode/xml/xml.js")
-                .Include($"{LibraryPath}/codemirror/mode/javascript/javascript.js")
-                .Include($"{LibraryPath}/codemirror/mode/css/css.js")
-                .Include($"{LibraryPath}/codemirror/mode/htmlmixed/htmlmixed.js")
-                .Include($"{LibraryPath}/codemirror/addon/format/autoformat.js", $"{LibraryPath}/codemirror/addon/format/autoformat.min.js");
-
             script("captcha")
                 .Include($"{ScriptPath}/captcha.js", $"{ScriptPath}/captcha.min.js");
 
@@ -107,6 +98,16 @@ namespace ZKEACMS.WebHost
             script("Antiforgery")
                 .Include("~/js/antiforgery/tokenset.js")
                 .RequiredAtFoot();
+
+            script("mammoth")
+                .Include($"{LibraryPath}/mammoth/mammoth.browser.js", $"{LibraryPath}/mammoth/mammoth.browser.min.js");
+
+            script("dropdown-tree")
+                .Include($"{ScriptPath}/dropdown-tree.js", $"{ScriptPath}/dropdown-tree.min.js");
+
+            script("code-editor")
+                .Include($"{LibraryPath}/monaco/min/vs/loader.js")
+                .Include($"{LibraryPath}/monaco/code-editor.js", $"{LibraryPath}/monaco/code-editor.min.js");
         }
 
         protected override void InitStyle(Func<string, ResourceHelper> style)
@@ -148,7 +149,8 @@ namespace ZKEACMS.WebHost
                .Include($"{LibraryPath}/jstree/dist/themes/default/style.css", $"{LibraryPath}/jstree/dist/themes/default/style.min.css");
 
             style("dataTable")
-                .Include($"{LibraryPath}/datatables/media/css/dataTables.bootstrap.css", $"{LibraryPath}/datatables/media/css/dataTables.bootstrap.min.css");
+                .Include($"{LibraryPath}/datatables/media/css/dataTables.bootstrap.css", $"{LibraryPath}/datatables/media/css/dataTables.bootstrap.min.css")
+                .Include($"{LibraryPath}/datatables/media/css/responsive.bootstrap.css", $"{LibraryPath}/datatables/media/css/responsive.bootstrap.min.css");
 
             style("datepicker")
                 .Include($"{LibraryPath}/bootstrap-datepicker/bootstrap-datetimepicker.min.css");
@@ -157,14 +159,13 @@ namespace ZKEACMS.WebHost
                 .Include($"{LibraryPath}/select2/dist/css/select2.css", $"{LibraryPath}/select2/dist/css/select2.min.css");
 
             style("rule")
-                .Include($"{StylePath}/rule.css", $"{StylePath}/rule.min.css");
-
-            style("codemirror").Include($"{LibraryPath}/codemirror/lib/codemirror.css")
-                .Include($"{LibraryPath}/codemirror/theme/monokai.css")
-                .Include($"{LibraryPath}/codemirror/addon/hint/show-hint.css");
+                .Include($"{StylePath}/rule.css", $"{StylePath}/rule.min.css");            
 
             style("captcha")
                 .Include($"{StylePath}/captcha.css", $"{StylePath}/captcha.min.css");
+
+            style("dropdown-tree")
+                .Include($"{StylePath}/dropdown-tree.css", $"{StylePath}/dropdown-tree.min.css");
         }
     }
 }

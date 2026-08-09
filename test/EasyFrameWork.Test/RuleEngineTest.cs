@@ -28,10 +28,9 @@ namespace EasyFrameWork.Test
             serviceCollection.AddTransient<IRuleProvider, DateRuleProvider>();
             serviceCollection.AddTransient<IRuleProvider, MoneyRuleProvider>();
             serviceCollection.AddTransient<IScriptExpressionEvaluator, ScriptExpressionEvaluator>();
-
-            serviceCollection.AddSingleton<ICacheProvider, DefaultCacheProvider>();
-            serviceCollection.AddSingleton(serviceProvider => serviceProvider.GetService<ICacheProvider>().Build<ScriptExpressionResult>());
-
+            serviceCollection.AddMemoryCache();
+            serviceCollection.AddTransient(typeof(ICacheManager<>), typeof(CacheManager<>));
+            serviceCollection.AddSingleton<ISignals, Signals>();
             ServiceProvider = serviceCollection.BuildServiceProvider();
         }
         [TestMethod]
@@ -64,7 +63,7 @@ namespace EasyFrameWork.Test
             var ruleManger = ServiceProvider.GetService<IRuleManager>();
             Assert.IsTrue(ruleManger.IsTrue("In(ValueOf('Name'),['A','B','C'])", new { Name = "A" }));
             Assert.IsTrue(ruleManger.IsTrue("ValueOf('Name')=='A'", new { Name = "A" }));
-            Assert.IsTrue(ruleManger.IsTrue("In(ValueOf('Name',2),['A','B','C'])", new { Name = new string[] { "A", "B", "C" } }));
+            Assert.IsTrue(ruleManger.IsTrue("In(ValueOf('Name[0]'),['A','B','C'])", new { Name = new string[] { "A", "B", "C" } }));
             Assert.IsTrue(ruleManger.Value("ValueOf('Name')", new { Name = "A" }).Equals("A"));
         }
         [TestMethod]

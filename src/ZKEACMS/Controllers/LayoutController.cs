@@ -2,20 +2,17 @@
  * Copyright (c) ZKEASOFT. All rights reserved. 
  * http://www.zkea.net/licenses */
 
-using Easy;
-using ZKEACMS.Common.ViewModels;
 using Easy.Constant;
 using Easy.Extend;
-using Easy.Mvc.Attribute;
 using Easy.Mvc.Authorize;
 using Easy.Mvc.Controllers;
 using Microsoft.AspNetCore.Mvc;
+using System.Linq;
+using ZKEACMS.Common.ViewModels;
 using ZKEACMS.Layout;
 using ZKEACMS.Page;
 using ZKEACMS.Widget;
 using ZKEACMS.Zone;
-using Microsoft.Extensions.DependencyInjection;
-using System.Linq;
 
 namespace ZKEACMS.Controllers
 {
@@ -25,12 +22,18 @@ namespace ZKEACMS.Controllers
         private readonly IPageService _pageService;
         private readonly IZoneService _zoneService;
         private readonly IWidgetBasePartService _widgetService;
-        public LayoutController(ILayoutService service, IPageService pageService, IZoneService zoneService, IWidgetBasePartService widgetService)
+        private readonly IPageContext _pageContext;
+        public LayoutController(ILayoutService service, 
+            IPageService pageService, 
+            IZoneService zoneService, 
+            IWidgetBasePartService widgetService, 
+            IPageContext pageContext)
             : base(service)
         {
             _pageService = pageService;
             _zoneService = zoneService;
             _widgetService = widgetService;
+            _pageContext = pageContext;
         }
 
 
@@ -39,9 +42,9 @@ namespace ZKEACMS.Controllers
             return View(Service.GetWithFull());
         }
 
-        public IActionResult LayoutWidget(string LayoutID)
+        public IActionResult LayoutWidget(string layoutId)
         {
-            ViewBag.LayoutID = LayoutID;
+            ViewBag.LayoutId = layoutId;
             return View(Service.Get().ToList());
         }
         [HttpPost]
@@ -51,7 +54,7 @@ namespace ZKEACMS.Controllers
             var viewModel = new LayoutZonesViewModel
             {
                 Layout = layout,
-                LayoutID = ID,
+                LayoutId = ID,
                 Zones = _zoneService.GetByLayoutId(ID),
                 Widgets = _widgetService.GetByLayoutId(ID),
                 LayoutHtml = layout.Html
@@ -79,19 +82,19 @@ namespace ZKEACMS.Controllers
         [HttpPost, DefaultAuthorize(Policy = PermissionKeys.ManageLayout)]
         public override IActionResult Edit(LayoutEntity entity)
         {
-            if (entity.ActionType == ActionType.Design)
+            if (entity.ActionType.HasFlag(ActionType.Design))
             {
                 return RedirectToAction("Design", new { entity.ID });
             }
             return base.Edit(entity);
         }
         [ResponseCache(NoStore = true)]
-        public IActionResult Design(string ID, string PageID)
+        public IActionResult Design(string ID, string PageId)
         {
             LayoutEntity layout = null;
-            if (PageID.IsNotNullAndWhiteSpace())
+            if (PageId.IsNotNullAndWhiteSpace())
             {
-                var page = _pageService.Get(PageID);
+                var page = _pageService.Get(PageId);
                 layout = Service.GetByPage(page);
                 layout.Page = page;
             }
@@ -102,6 +105,18 @@ namespace ZKEACMS.Controllers
             if (layout == null)
             {
                 return NotFound();
+            }
+            _pageContext.Meta.Add(new MetaTag(new { http_equiv = "cache-control", content = "no-cache" }));
+            _pageContext.Meta.Add(new MetaTag(new { http_equiv = "cache-control", content = "no-store" }));
+            _pageContext.Meta.Add(new MetaTag(new { http_equiv = "expires", content = "-1" }));
+            _pageContext.Meta.Add(new MetaTag(new { http_equiv = "pragma", content = "no-cache" }));
+            if (layout.Style.IsNotNullAndWhiteSpace())
+            {
+                _pageContext.StyleSheets.Add(layout.Style);
+            }
+            if (layout.Script.IsNotNullAndWhiteSpace())
+            {
+                _pageContext.FooterScripts.Add(layout.Script);
             }
             return View(layout ?? new LayoutEntity());
         }

@@ -12,17 +12,23 @@ using Easy.Extend;
 using Easy.RepositoryPattern;
 using Easy;
 using Microsoft.EntityFrameworkCore;
+using Easy.AuditTrail;
 
 namespace ZKEACMS.Common.Service
 {
     public class CarouselService : ServiceBase<CarouselEntity, CMSDbContext>, ICarouselService
     {
         private readonly ICarouselItemService _carouselItemService;
+        private readonly IAuditTrailService _auditTrailService;
 
-        public CarouselService(ICarouselItemService carouselItemService, IApplicationContext applicationContext, CMSDbContext dbContext)
+        public CarouselService(ICarouselItemService carouselItemService,
+            IApplicationContext applicationContext,
+            CMSDbContext dbContext,
+            IAuditTrailService auditTrailService)
             : base(applicationContext, dbContext)
         {
             _carouselItemService = carouselItemService;
+            _auditTrailService = auditTrailService;
         }
 
         public override DbSet<CarouselEntity> CurrentDbSet => DbContext.Carousel;
@@ -34,10 +40,10 @@ namespace ZKEACMS.Common.Service
             return carousel;
         }
 
-        public override ServiceResult<CarouselEntity> Add(CarouselEntity item)
+        public override ErrorOr<CarouselEntity> Add(CarouselEntity item)
         {
             var result = base.Add(item);
-            if (result.HasViolation)
+            if (result.HasError)
             {
                 return result;
             }
@@ -47,47 +53,44 @@ namespace ZKEACMS.Common.Service
                 item.CarouselItems.Each(m =>
                 {
                     m.CarouselID = item.ID;
-                    if (m.ActionType == ActionType.Create)
+                    if (m.ActionType.HasFlag(ActionType.Create))
                     {
                         var itemResult = _carouselItemService.Add(m);
-                        if (itemResult.HasViolation)
+                        if (itemResult.HasError)
                         {
-                            result.RuleViolations.AddRange(itemResult.RuleViolations);
+                            itemResult.Errors.Each(result.AddError);
                         }
                     }
                 });
-                _carouselItemService.SaveChanges();
+                _carouselItemService.EndBulkSave();
             }
             return result;
         }
         private void SaveCarouselItems(CarouselItemEntity item)
         {
-            switch (item.ActionType)
+
+            if (item.ActionType.HasFlag(ActionType.Create))
             {
-                case ActionType.Create:
-                    {
-                        _carouselItemService.Add(item);
-                        break;
-                    }
-                case ActionType.Update:
-                    {
-                        _carouselItemService.Update(item);
-                        break;
-                    }
-                case ActionType.Delete:
-                    {
-                        if (item.ID > 0)
-                        {
-                            _carouselItemService.Remove(item);
-                        }
-                        break;
-                    }
+                _carouselItemService.Add(item);
             }
+            else if (item.ActionType.HasFlag(ActionType.Update))
+            {
+                _carouselItemService.Update(item);
+            }
+            else if (item.ActionType.HasFlag(ActionType.Delete))
+            {
+                if (item.ID > 0)
+                {
+                    _carouselItemService.Remove(item);
+                }
+            }
+
         }
-        public override ServiceResult<CarouselEntity> Update(CarouselEntity item)
+        public override ErrorOr<CarouselEntity> Update(CarouselEntity item)
         {
+            var old = Get(item.ID);
             var result = base.Update(item);
-            if (result.HasViolation)
+            if (result.HasError)
             {
                 return result;
             }
@@ -99,14 +102,15 @@ namespace ZKEACMS.Common.Service
                     m.CarouselID = item.ID;
                     SaveCarouselItems(m);
                 });
-                _carouselItemService.SaveChanges();
+                _carouselItemService.EndBulkSave();
             }
+            _auditTrailService.AuditUpdate(old, Get(item.ID));
             return result;
         }
-        public override ServiceResult<CarouselEntity> UpdateRange(params CarouselEntity[] items)
+        public override ErrorOr<CarouselEntity> UpdateRange(params CarouselEntity[] items)
         {
             var result = base.UpdateRange(items);
-            if (result.HasViolation)
+            if (result.HasError)
             {
                 return result;
             }
@@ -120,7 +124,7 @@ namespace ZKEACMS.Common.Service
                         carItem.CarouselID = m.ID;
                         SaveCarouselItems(carItem);
                     });
-                    _carouselItemService.SaveChanges();
+                    _carouselItemService.EndBulkSave();
                 }
             });
             return result;
@@ -131,7 +135,7 @@ namespace ZKEACMS.Common.Service
             {
                 _carouselItemService.BeginBulkSave();
                 item.CarouselItems.Each(m => _carouselItemService.Remove(m));
-                _carouselItemService.SaveChanges();
+                _carouselItemService.EndBulkSave();
             }
             base.Remove(item);
         }

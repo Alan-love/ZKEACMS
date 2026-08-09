@@ -1,0 +1,85 @@
+/* http://www.zkea.net/ 
+ * Copyright (c) ZKEASOFT. All rights reserved. 
+ * http://www.zkea.net/licenses */
+
+using Easy.Constant;
+using Easy.Extend;
+using Easy.Mvc.Authorize;
+using Easy.Mvc.Controllers;
+using Microsoft.AspNetCore.Mvc;
+using System;
+using ZKEACMS.Article.ActionFilter;
+using ZKEACMS.Article.Models;
+using ZKEACMS.Article.Service;
+
+namespace ZKEACMS.Article.Controllers
+{
+    [DefaultAuthorize, ViewDataArticleType]
+    public class ArticleController : BasicController<ArticleEntity, int, IArticleService>
+    {
+        private readonly IAuthorizer _authorizer;
+        public ArticleController(IArticleService service, IAuthorizer authorizer)
+            : base(service)
+        {
+            _authorizer = authorizer;
+        }
+        [DefaultAuthorize(Policy = PermissionKeys.ViewArticle)]
+        public override IActionResult Index()
+        {
+            return base.Index();
+        }
+        [DefaultAuthorize(Policy = PermissionKeys.ManageArticle)]
+        public override IActionResult Create()
+        {
+            return base.Create();
+        }
+        [HttpPost, DefaultAuthorize(Policy = PermissionKeys.ManageArticle)]
+        public override IActionResult Create(ArticleEntity entity)
+        {
+            if (entity.ActionType.HasFlag(ActionType.Publish) && _authorizer.Authorize(PermissionKeys.PublishArticle))
+            {
+                Service.Publish(entity);
+            }
+            var result = base.Create(entity);
+            return result;
+        }
+        [DefaultAuthorize(Policy = PermissionKeys.ManageArticle)]
+        public override IActionResult Edit(int Id)
+        {
+            return base.Edit(Id);
+        }
+        [HttpPost, DefaultAuthorize(Policy = PermissionKeys.ManageArticle)]
+        public override IActionResult Edit(ArticleEntity entity)
+        {
+            if (entity.ActionType.HasFlag(ActionType.Publish) && _authorizer.Authorize(PermissionKeys.PublishArticle))
+            {
+                entity.IsPublish = true;
+                if (entity.PublishDate == null)
+                {
+                    entity.PublishDate = DateTime.Now;
+                }
+            }
+            var result = base.Edit(entity);
+            if (Request.Query["ReturnUrl"].Count > 0)
+            {
+                return Redirect(Request.Query["ReturnUrl"]);
+            }
+            return result;
+        }
+        [HttpPost, DefaultAuthorize(Policy = PermissionKeys.ViewArticle)]
+        public override IActionResult GetList(DataTableOption query)
+        {
+            return base.GetList(query);
+        }
+        [DefaultAuthorize(Policy = PermissionKeys.ManageArticle)]
+        public override IActionResult Delete(int id)
+        {
+            return base.Delete(id);
+        }
+        [DefaultAuthorize(Policy = PermissionKeys.ViewArticle)]
+        public IActionResult Select()
+        {
+            return View();
+        }
+    }
+}

@@ -3,6 +3,7 @@
  * http://www.zkea.net/licenses */
 
 using Easy.Extend;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Text.RegularExpressions;
@@ -13,7 +14,10 @@ namespace ZKEACMS
     {
         public const string CopyWidgetCookie = "F84DBA";
     }
-
+    public class DictionaryKeys
+    {
+        public const string WidgetStatus = "WidgetStatus";
+    }
     public class Layouts
     {
         /// <summary>
@@ -28,14 +32,6 @@ namespace ZKEACMS
         /// Layout for user created pages
         /// </summary>
         public const string Default = "_Layout";
-        /// <summary>
-        /// Layout with current theme and body with container.
-        /// </summary>
-        public const string NormalDefault = "_LayoutNormal";
-        /// <summary>
-        /// Layout with current theme
-        /// </summary>
-        public const string Generic = "_LayoutGeneric";
         /// <summary>
         /// Layout for admin pop up modal
         /// </summary>
@@ -102,37 +98,22 @@ namespace ZKEACMS
         Ppt = 9,
         Other = 100
     }
-
+    public enum WidgetStatus
+    {
+        Undefined = 0,
+        Visible = 1,
+        Hidden = 2,
+        Deleted = 3
+    }
     public static class FileExtensions
     {
-        public static List<string> Video
-        {
-            get { return new List<string> { ".mp4", ".avi", ".rmvb" }; }
-        }
-        public static List<string> Zip
-        {
-            get { return new List<string> { ".rar", ".zip", ".7z" }; }
-        }
-        public static List<string> Pdf
-        {
-            get { return new List<string> { ".pdf" }; }
-        }
-        public static List<string> Txt
-        {
-            get { return new List<string> { ".txt" }; }
-        }
-        public static List<string> Doc
-        {
-            get { return new List<string> { ".doc", ".docx" }; }
-        }
-        public static List<string> Excel
-        {
-            get { return new List<string> { ".xls", ".xlsx" }; }
-        }
-        public static List<string> Ppt
-        {
-            get { return new List<string> { ".ppt", ".pptx" }; }
-        }
+        public static HashSet<string> Video = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".mp4", ".avi", ".rmvb", ".flv", ".wmv", ".asf", ".asx", ".rm", ".3gp", ".mov", ".m4v", ".mkv", ".vob" };
+        public static HashSet<string> Zip = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".rar", ".zip", ".7z", ".arj", ".bz2", ".cab", ".gz", ".lz", ".lzh", ".tar", ".uue", ".xz", ".zipx", ".zst", ".001" };
+        public static HashSet<string> Pdf = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".pdf" };
+        public static HashSet<string> Txt = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".txt" };
+        public static HashSet<string> Doc = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".doc", ".docx" };
+        public static HashSet<string> Excel = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".xls", ".xlsx" };
+        public static HashSet<string> Ppt = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".ppt", ".pptx" };
     }
 
     public static class StringKeys
@@ -166,13 +147,27 @@ namespace ZKEACMS
         }
     }
 
-    public static class CustomRegex
+    public static partial class CustomRegex
     {
-        public static readonly Regex StyleRegex = new Regex(@"style=""([^""]*)""", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        [GeneratedRegex("style=\"([^\"]*)\"", RegexOptions.IgnoreCase)]
+        public static partial Regex CssStyle();
 
-        public static Regex PostIdRegex = new Regex(@"/post-(\d+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        public static Regex CategoryIdRegex = new Regex(@"/cate-(\d+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        public static Regex PageRegex = new Regex(@"/p-(\d+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        [GeneratedRegex("/post-(\\d+)", RegexOptions.IgnoreCase)]
+        public static partial Regex PostId();
+        [GeneratedRegex("/cate-(\\d+)", RegexOptions.IgnoreCase)]
+        public static partial Regex CategoryId();
+
+        [GeneratedRegex("/p-(\\d+)", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+        public static partial Regex PageIndex();
+
+        [GeneratedRegex(@"\.(\d+)", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+        public static partial Regex DecimalPoint();
+    }
+    public static class CacheSignals
+    {
+        public const string PageUrlChanged = "PageUrlChanged";
+        public const string PageWidgetChanged = "PageWidgetChanged";
+        public const string PageZoneChanged = "PageZoneChanged";
     }
     public static class Version
     {
@@ -183,8 +178,7 @@ namespace ZKEACMS
             {
                 if (_version == null)
                 {
-                    var attr = typeof(Version).GetTypeInfo().Assembly.GetCustomAttribute(typeof(AssemblyInformationalVersionAttribute)) as AssemblyInformationalVersionAttribute;
-                    _version = $"ZKEACMS v{attr.InformationalVersion}";
+                    _version = $"ZKEACMS v{VersionInfo}";
                 }
                 return _version;
             }
@@ -196,8 +190,8 @@ namespace ZKEACMS
             {
                 if (_versionInfo == null)
                 {
-                    var attr = typeof(Version).GetTypeInfo().Assembly.GetCustomAttribute(typeof(AssemblyInformationalVersionAttribute)) as AssemblyInformationalVersionAttribute;
-                    _versionInfo = attr.InformationalVersion;
+                    var attr = typeof(Version).GetTypeInfo().Assembly.GetCustomAttribute(typeof(AssemblyFileVersionAttribute)) as AssemblyFileVersionAttribute;
+                    _versionInfo = attr.Version;
                 }
                 return _versionInfo;
             }

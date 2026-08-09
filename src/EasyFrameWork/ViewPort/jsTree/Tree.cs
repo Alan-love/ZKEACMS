@@ -11,6 +11,7 @@ using Easy.Extend;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Routing;
+using Easy.Serializer;
 
 namespace Easy.ViewPort.jsTree
 {
@@ -157,15 +158,15 @@ namespace Easy.ViewPort.jsTree
             {
                 builder.AppendFormat(".on('{0}',{1})", item.Key, item.Value);
             }
-            string source = "{'url' : '" + _sourceUrl + "','data' : function (node) {return { 'id' : node.id };}}";
+            string source = "{'url' : '" + _sourceUrl + "','data' : function (node) {return { 'id' : node.id, 't': new Date().getTime() };}}";
             if (nodes != null && nodes.Count > 0)
             {
-                source = Newtonsoft.Json.JsonConvert.SerializeObject(nodes);
+                source = JsonConverter.Serialize(nodes);
             }
             builder.AppendFormat(".jstree({{'core':{{data:{0},'check_callback':{1}}}", source, _check_callback.IsNullOrEmpty() ? "false" : _check_callback);
             if (_plugins.Count > 0)
             {
-                builder.AppendFormat(",'plugins':{0}", Newtonsoft.Json.JsonConvert.SerializeObject(_plugins));
+                builder.AppendFormat(",'plugins':{0}", JsonConverter.Serialize(_plugins));
             }
             if (contextMenu.Count > 0)
             {
@@ -204,7 +205,7 @@ namespace Easy.ViewPort.jsTree
         {
             Node node = new Node();
             node.id = valueProperty(data);
-            node.text = textProperty(data);
+            node.text = System.Net.WebUtility.HtmlEncode(textProperty(data));
             node.state = new State { opened = _expandAll };
             node.a_attr = data;
             node.children = new List<Node>();

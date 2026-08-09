@@ -1,0 +1,120 @@
+/* http://www.zkea.net/ 
+ * Copyright (c) ZKEASOFT. All rights reserved. 
+ * http://www.zkea.net/licenses */
+
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Xml;
+using ZKEACMS.SectionWidget.Models;
+using Easy.Extend;
+using Easy.Reflection;
+using Easy.RepositoryPattern;
+using Microsoft.AspNetCore.Hosting;
+using Easy;
+using Microsoft.EntityFrameworkCore;
+using Easy.Mvc.Plugin;
+
+namespace ZKEACMS.SectionWidget.Service
+{
+    public class SectionGroupService : ServiceBase<SectionGroup, CMSDbContext>, ISectionGroupService
+    {
+        private readonly ISectionContentProviderService _sectionContentProviderService;
+        private readonly SectionPlug _sectionPlug;
+
+        public SectionGroupService(ISectionContentProviderService sectionContentProviderService, SectionPlug sectionPlug, IApplicationContext applicationContext, CMSDbContext dbContext) : base(applicationContext, dbContext)
+        {
+            _sectionContentProviderService = sectionContentProviderService;
+            _sectionPlug = sectionPlug;
+        }
+        public override IQueryable<SectionGroup> Get()
+        {
+            return CurrentDbSet.AsNoTracking();
+        }
+        public SectionGroup GenerateContentFromConfig(SectionGroup group)
+        {
+            List<SectionContent> contents = new List<SectionContent>();
+
+            using (var fileStream = _sectionPlug.GetResourceStream("~/Thumbnail/{0}.xml".FormatWith(group.PartialView)))
+            {
+                XmlDocument doc = new XmlDocument();
+                doc.Load(fileStream);
+                var nodes = doc.SelectNodes("/required/item");
+                const string fullNameSpace = "ZKEACMS.SectionWidget.Models.{0}";
+                foreach (XmlNode item in nodes)
+                {
+                    var attr = item.Attributes["type"];
+
+                    if (attr != null && attr.Value.IsNotNullAndWhiteSpace())
+                    {
+                        var typeInfoArray = attr.Value.Split('.');
+                        string fullTypeInfo = fullNameSpace.FormatWith(typeInfoArray[typeInfoArray.Length - 1]);
+                        if (SectionPlug.ContentTypes.ContainsKey(fullTypeInfo))
+                        {
+                            var content = Activator.CreateInstance(SectionPlug.ContentTypes[fullTypeInfo]) as SectionContent;
+                            var properties = item.SelectNodes("property");
+                            foreach (XmlNode property in properties)
+                            {
+                                var name = property.Attributes["name"];
+                                if (name != null && name.Value.IsNotNullAndWhiteSpace() && property.InnerText.IsNotNullAndWhiteSpace())
+                                {
+                                    PropertyHelper.SetValue(content, name.Value, property.InnerText);
+                                }
+                            }
+                            content.SectionGroupId = group.ID;
+                            content.SectionWidgetId = group.SectionWidgetId;
+                            contents.Add(content);
+                        }
+
+                    }
+                }
+            }
+
+            group.SectionContents = contents;
+            return group;
+        }
+        public override ErrorOr<SectionGroup> Add(SectionGroup item)
+        {
+            item.ID = Guid.NewGuid().ToString("N");
+            var result = base.Add(item);
+            if (result.HasError)
+            {
+                return result;
+            }
+            if (item.SectionContents != null && item.SectionContents.Any())
+            {
+                item.SectionContents.Each(m =>
+                {
+                    m.SectionGroupId = item.ID;
+                    m.SectionWidgetId = item.SectionWidgetId;
+                    _sectionContentProviderService.Add(m);
+                });
+            }
+            if (item.IsLoadDefaultData)
+            {
+                GenerateContentFromConfig(item);
+                if (item.SectionContents != null && item.SectionContents.Any())
+                {
+                    item.SectionContents.Each(c =>
+                    {
+                        _sectionContentProviderService.Add(c);
+                    });
+                }
+            }
+            return result;
+        }
+        public override void Remove(SectionGroup item)
+        {
+            if (item != null)
+            {
+                var contents = _sectionContentProviderService.Get(m => m.SectionGroupId == item.ID);
+                contents.Each(m =>
+                {
+                    _sectionContentProviderService.Remove(m.ID);
+                });
+            }
+            base.Remove(item);
+        }
+    }
+}

@@ -67,7 +67,7 @@ namespace ZKEACMS
             get;
             set;
         }
-        public List<CompilationLibrary> Dependency { get; set; }
+        public List<Assembly> Dependencies { get; set; }
         public IEnumerable<TypeInfo> Types => Assembly.DefinedTypes;
         public override string Name => Assembly.GetName().Name;
 
@@ -242,17 +242,44 @@ namespace ZKEACMS
         {
             if (Assembly.IsDynamic)
             {
-                return Enumerable.Empty<string>();
+                yield break;
             }
 
-            if (Dependency.Count > 0)
+            yield return Assembly.Location;
+            foreach (var item in Dependencies)
             {
-                return Dependency.SelectMany(library => library.ResolveReferencePaths(new DependencyAssemblyResolver(Path.GetDirectoryName(Assembly.Location))))
-                    .Concat(new[] { Assembly.Location });
+                yield return item.Location;
             }
-
-            return new[] { Assembly.Location };
         }
+        public string ReadTextResource(string resourceName)
+        {
+            string matchResourceName = MapToResourceName(resourceName);
+
+            using (var stream = Assembly.GetManifestResourceStream(matchResourceName))
+            {
+                if (stream == null) return null;
+
+                using (var reader = new StreamReader(stream))
+                {
+                    return reader.ReadToEnd();
+                }
+            }
+        }
+        public Stream GetResourceStream(string resourceName)
+        {
+            var matchResourceName = MapToResourceName(resourceName);
+            return Assembly.GetManifestResourceStream(matchResourceName);
+        }
+        public string[] GetResourceNames()
+        {
+            return Assembly.GetManifestResourceNames();
+        }
+
+        private string MapToResourceName(string resourceName)
+        {
+            return PluginInfo.FormatResourcePath(resourceName.Replace("~/", Assembly.GetName().Name + "."));
+        }
+
         #region Viewfeature
         public virtual void PopulateFeature(IEnumerable<ApplicationPart> parts, ViewsFeature feature)
         {
@@ -269,7 +296,7 @@ namespace ZKEACMS
                 }
             }
             var knownIdentifiers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var attributes = GetViewAttributesLegacy(Assembly);
+            var attributes = new RazorCompiledItemLoader().LoadItems(Assembly);
             foreach (var item in attributes)
             {
                 var descriptor = new CompiledViewDescriptor(item);
@@ -284,44 +311,6 @@ namespace ZKEACMS
                     feature.ViewDescriptors.Add(descriptor);
                 }
             }
-        }
-
-
-        protected virtual IEnumerable<RazorCompiledItem> GetViewAttributesLegacy(Assembly assembly)
-        {
-            if (assembly == null)
-            {
-                throw new ArgumentNullException(nameof(assembly));
-            }
-
-            var featureAssembly = GetViewAssembly(assembly);
-            if (featureAssembly != null)
-            {
-                return new RazorCompiledItemLoader().LoadItems(featureAssembly);
-            }
-
-            return Enumerable.Empty<RazorCompiledItem>();
-        }
-
-        protected virtual Assembly GetViewAssembly(Assembly assembly)
-        {
-            if (assembly.IsDynamic || string.IsNullOrEmpty(assembly.Location))
-            {
-                return null;
-            }
-            string[] viewAssemblySuffixes = new string[] { ".Views", ".PrecompiledViews" };
-            for (var i = 0; i < viewAssemblySuffixes.Length; i++)
-            {
-                var fileName = $"{assembly.GetName().Name}{viewAssemblySuffixes[i]}.dll";
-                var filePath = Path.Combine(Path.GetDirectoryName(assembly.Location), fileName);
-
-                if (File.Exists(filePath))
-                {
-                    return Assembly.LoadFile(filePath);
-                }
-            }
-
-            return null;
         }
         #endregion
     }

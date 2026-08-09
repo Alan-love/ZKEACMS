@@ -6,12 +6,12 @@ using System;
 using System.Collections.Concurrent;
 using System.Linq;
 using Easy;
+using Easy.AuditTrail;
 using Easy.Cache;
 using Easy.Constant;
 using Easy.Extend;
 using Easy.RepositoryPattern;
 using Microsoft.EntityFrameworkCore;
-using Newtonsoft.Json;
 using ZKEACMS.DataArchived;
 
 namespace ZKEACMS.Setting
@@ -19,15 +19,18 @@ namespace ZKEACMS.Setting
     public class ApplicationSettingService : ServiceBase<ApplicationSetting, CMSDbContext>, IApplicationSettingService
     {
         private readonly IDataArchivedService _dataArchivedService;
-        private readonly ConcurrentDictionary<string, object> _settingCache;
+        private readonly ICacheManager<ApplicationSettingService> _cacheManager;
+        private readonly IAuditTrailService _auditTrailService;
         private const string ApplicationSetting = "ApplicationSetting";
         public ApplicationSettingService(IApplicationContext applicationContext,
             IDataArchivedService dataArchivedService,
-            ICacheManager<ConcurrentDictionary<string, object>> cacheManager,
-            CMSDbContext dbContext) : base(applicationContext, dbContext)
+            ICacheManager<ApplicationSettingService> cacheManager,
+            CMSDbContext dbContext,
+            IAuditTrailService auditTrailService) : base(applicationContext, dbContext)
         {
             _dataArchivedService = dataArchivedService;
-            _settingCache = cacheManager.GetOrAdd(ApplicationSetting, new ConcurrentDictionary<string, object>());
+            _cacheManager = cacheManager;
+            _auditTrailService = auditTrailService;
         }
 
         public override DbSet<ApplicationSetting> CurrentDbSet => DbContext.ApplicationSetting;
@@ -37,34 +40,27 @@ namespace ZKEACMS.Setting
             return CurrentDbSet.AsNoTracking();
         }
 
-        public override ServiceResult<ApplicationSetting> Add(ApplicationSetting item)
+        public override ErrorOr<ApplicationSetting> Add(ApplicationSetting item)
         {
             lock (ApplicationSetting)
             {
-                if (base.Get(item.SettingKey) == null)
-                {
-                    _settingCache.TryAdd(item.SettingKey, item);
-                    return base.Add(item);
-                }
-                var result = new ServiceResult<ApplicationSetting>();
-                result.RuleViolations.Add(new RuleViolation("SettingKey", ApplicationContext.GetService<ILocalize>().Get("The setting key is already exists")));
-                return result;
+                if (base.Get(item.SettingKey) != null) return new Error("SettingKey", ApplicationContext.GetService<ILocalize>().Get("The setting key is already exists"));
+
+                return base.Add(item);
             }
 
         }
         public override ApplicationSetting Get(params object[] primaryKey)
         {
-            if (_settingCache.TryGetValue(primaryKey[0].ToString(), out object value))
+            return _cacheManager.GetOrCreate(primaryKey[0].ToString(), factory =>
             {
-                return value as ApplicationSetting;
-            }
-            var entity = base.Get(primaryKey);
-            if (entity != null)
-            {
-                DbContext.Attach(entity).State = EntityState.Detached;
-                _settingCache.TryAdd(entity.SettingKey, entity);
-            }
-            return null;
+                var entity = base.Get(primaryKey);
+                if (entity != null)
+                {
+                    DbContext.Attach(entity).State = EntityState.Detached;
+                }
+                return entity;
+            });
         }
         public string Get(string settingKey, string defaultValue)
         {
@@ -84,18 +80,21 @@ namespace ZKEACMS.Setting
             return setting.Value;
         }
 
-        public override ServiceResult<ApplicationSetting> Update(ApplicationSetting item)
+        public override ErrorOr<ApplicationSetting> Update(ApplicationSetting item)
         {
-            if (_settingCache.TryGetValue(item.SettingKey, out object oldSetting))
+            _cacheManager.Remove(item.SettingKey);
+            var oldItem = Get(item.SettingKey);
+            var result = base.Update(item);
+            if (result.IsSuccess)
             {
-                _settingCache.TryUpdate(item.SettingKey, item, oldSetting);
+                _auditTrailService.AuditUpdate(oldItem, item);
             }
-            return base.Update(item);
+            return result;
         }
 
         public override void Remove(ApplicationSetting item)
         {
-            _settingCache.TryRemove(item.SettingKey, out _);
+            _cacheManager.Remove(item.SettingKey);
             base.Remove(item);
         }
         #region Serialize Settings
@@ -108,7 +107,7 @@ namespace ZKEACMS.Setting
 
         public T Get<T>(string key) where T : class, new()
         {
-            return _settingCache.GetOrAdd(key, k => _dataArchivedService.Get<T>(k, () => new T())) as T;
+            return _cacheManager.GetOrCreate(key, factory => _dataArchivedService.Get<T>(key, () => new T())) as T;
         }
 
         public void Save<T>(T setting) where T : class, new()
@@ -118,10 +117,7 @@ namespace ZKEACMS.Setting
 
         public void Save<T>(string key, T setting) where T : class, new()
         {
-            if (_settingCache.TryGetValue(key, out object oldSetting))
-            {
-                _settingCache.TryUpdate(key, setting, oldSetting);
-            }
+            _cacheManager.Remove(key);
             _dataArchivedService.Archive<T>(key, setting);
         }
         #endregion

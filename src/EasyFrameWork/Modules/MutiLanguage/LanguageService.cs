@@ -2,102 +2,88 @@
  * Copyright (c) ZKEASOFT. All rights reserved. 
  * http://www.zkea.net/licenses */
 
+using Easy.Cache;
+using Easy.Extend;
+using Easy.RepositoryPattern;
+using Easy.Serializer;
+using FastExpressionCompiler;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Hosting;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
-using Easy.Cache;
-using Easy.RepositoryPattern;
-using Microsoft.EntityFrameworkCore;
+using System.Linq.Expressions;
+using System.Text;
+using YamlDotNet.Serialization;
+using YamlDotNet.Serialization.NamingConventions;
 
 namespace Easy.Modules.MutiLanguage
 {
-    public class LanguageService : ServiceBase<LanguageEntity, EasyDbContext>, ILanguageService
+    public class LanguageService : ILanguageService
     {
-        private readonly ICacheManager<ConcurrentDictionary<string, ConcurrentDictionary<string, LanguageEntity>>> _cacheManager;
-        public LanguageService(IApplicationContext applicationContext,
-            ICacheManager<ConcurrentDictionary<string, ConcurrentDictionary<string, LanguageEntity>>> cacheManager,
-            EasyDbContext easyDbContext)
-            : base(applicationContext, easyDbContext)
+        private readonly ICacheManager<LanguageService> _cacheManager;
+        private readonly IWebHostEnvironment _webHostEnvironment;
+        private readonly ISignals _signals;
+        private const string LanguageChanged = "LanguageChanged";
+        public LanguageService(ICacheManager<LanguageService> cacheManager, IWebHostEnvironment webHostEnvironment, ISignals signals)
         {
             _cacheManager = cacheManager;
+            _webHostEnvironment = webHostEnvironment;
+            _signals = signals;
         }
 
-        public override DbSet<LanguageEntity> CurrentDbSet
+        private string GetLocaleDirectory()
         {
-            get { return DbContext.Language; }
-        }
-        public override IQueryable<LanguageEntity> Get()
-        {
-            return CurrentDbSet.AsNoTracking();
-        }
-        public override ServiceResult<LanguageEntity> Add(LanguageEntity item)
-        {
-            var result = base.Add(item);
-            if (!result.HasViolation)
-            {
-                var dict = GetAll();
-                if (dict.ContainsKey(item.LanKey))
-                {
-                    dict[item.LanKey].TryAdd(item.CultureName, item);
-                }
-                else
-                {
-                    ConcurrentDictionary<string, LanguageEntity> cultureDic = new ConcurrentDictionary<string, LanguageEntity>();
-                    cultureDic.TryAdd(item.CultureName, item);
-                    dict.TryAdd(item.LanKey, cultureDic);
-                }
-            }
-            return result;
-        }
-        public override LanguageEntity Get(params object[] primaryKey)
-        {
-            LanguageEntity languageEntity = null;
-            if (primaryKey.Length == 2)
-            {
-                if (GetAll().TryGetValue(primaryKey[0].ToString(), out ConcurrentDictionary<string, LanguageEntity> cultureLan))
-                {
-                    cultureLan.TryGetValue(primaryKey[1].ToString(), out languageEntity);
-                }
-            }
-            return languageEntity;
+            return Path.Combine(_webHostEnvironment.ContentRootPath, "Locale");
         }
 
-        public IEnumerable<LanguageEntity> GetCultures(string lanKey)
+        private IEnumerable<LanguageEntity> GetAllFromLocaleFile()
         {
-            if (GetAll().TryGetValue(lanKey, out ConcurrentDictionary<string, LanguageEntity> cultureDic))
+            List<LanguageEntity> entities = new List<LanguageEntity>();
+            string localeDir = GetLocaleDirectory();
+            string[] localeFiles = Directory.GetFiles(localeDir, "*.yml");
+            foreach (string localeFile in localeFiles)
             {
-                foreach (var item in cultureDic)
+                string cultureName = Path.GetFileNameWithoutExtension(localeFile);
+                Dictionary<string, string> localize = ReadLocalizeTextFromFile(localeFile);
+                foreach (var item in localize)
                 {
-                    yield return item.Value;
+                    entities.Add(new LanguageEntity
+                    {
+                        CultureName = cultureName,
+                        LanKey = item.Key,
+                        LanValue = item.Value
+                    });
                 }
             }
+            return entities;
         }
-        public override ServiceResult<LanguageEntity> Update(LanguageEntity item)
+
+        private static Dictionary<string, string> ReadLocalizeTextFromFile(string localeFile)
         {
-            if (GetAll().TryGetValue(item.LanKey.ToString(), out ConcurrentDictionary<string, LanguageEntity> cultureLan))
-            {
-                if (cultureLan.TryGetValue(item.CultureName, out LanguageEntity oldItem))
-                {
-                    cultureLan.TryUpdate(item.CultureName, item, oldItem);
-                    return base.Update(item);
-                }
-                else
-                {
-                    return Add(item);
-                }
-            }
-            else
-            {
-                return Add(item);
-            }
+            string localizeText = File.ReadAllText(localeFile, Encoding.UTF8);
+            var localize = YamlConverter.Deserialize<Dictionary<string, string>>(localizeText);
+            return localize;
         }
-        private ConcurrentDictionary<string, ConcurrentDictionary<string, LanguageEntity>> GetAll()
+
+        private static void SaveLocalizeTextToFile(string localeFile, Dictionary<string, string> localizeText)
         {
-            return _cacheManager.GetOrAdd("AllLanguageEntry", factory =>
+            string serializedData = YamlConverter.Serialize(localizeText);
+            File.WriteAllText(localeFile, serializedData, Encoding.UTF8);
+        }
+
+        private ConcurrentDictionary<string, ConcurrentDictionary<string, LanguageEntity>> GetAllFromCache()
+        {
+            return _cacheManager.GetOrCreate("AllLanguageEntry", factory =>
             {
-                ConcurrentDictionary<string, ConcurrentDictionary<string, LanguageEntity>> result = new ConcurrentDictionary<string, ConcurrentDictionary<string, LanguageEntity>>(StringComparer.OrdinalIgnoreCase);
-                foreach (var item in Get())
+                factory.AddExpirationToken(_signals.When(LanguageChanged));
+                factory.AddExpirationToken(_webHostEnvironment.ContentRootFileProvider.Watch("Locale/*.yml"));
+
+                var result = new ConcurrentDictionary<string, ConcurrentDictionary<string, LanguageEntity>>(StringComparer.OrdinalIgnoreCase);
+                foreach (var item in GetAllFromLocaleFile())
                 {
                     if (!result.TryGetValue(item.LanKey, out ConcurrentDictionary<string, LanguageEntity> cultureDic))
                     {
@@ -118,7 +104,55 @@ namespace Easy.Modules.MutiLanguage
             });
         }
 
-        public ServiceResult<LanguageEntity> AddOrUpdate(LanguageEntity entity)
+        private ErrorOr<LanguageEntity> Save(LanguageEntity item)
+        {
+            var result = new ErrorOr<LanguageEntity>();
+            var localeFile = Path.Combine(GetLocaleDirectory(), $"{item.CultureName}.yml");
+            try
+            {
+                var localizeText = ReadLocalizeTextFromFile(localeFile);
+                localizeText[item.LanKey] = item.LanValue;
+                SaveLocalizeTextToFile(localeFile, localizeText);
+                _signals.Trigger(LanguageChanged);
+            }
+            catch (Exception ex)
+            {
+                result.AddError(ex.Message);
+            }
+            return result;
+        }
+
+        public ErrorOr<LanguageEntity> Add(LanguageEntity item)
+        {
+            return Save(item);
+        }
+        public LanguageEntity Get(string lanKey, string cultureName)
+        {
+            if (!GetAllFromCache().TryGetValue(lanKey, out ConcurrentDictionary<string, LanguageEntity> cultureLan)) return null;
+
+            if (cultureLan.TryGetValue(cultureName, out LanguageEntity languageEntity)) return languageEntity;
+
+            if (cultureLan.TryGetValue(cultureName.Split('-')[0], out languageEntity)) return languageEntity;
+            return null;
+        }
+
+        public IEnumerable<LanguageEntity> GetCultures(string lanKey)
+        {
+            if (GetAllFromCache().TryGetValue(lanKey, out ConcurrentDictionary<string, LanguageEntity> cultureDic))
+            {
+                foreach (var item in cultureDic)
+                {
+                    yield return item.Value;
+                }
+            }
+        }
+        public ErrorOr<LanguageEntity> Update(LanguageEntity item)
+        {
+            return Save(item);
+        }
+
+
+        public ErrorOr<LanguageEntity> AddOrUpdate(LanguageEntity entity)
         {
             LanguageEntity translate = Get(entity.LanKey, entity.CultureName);
             if (translate == null)
@@ -130,6 +164,51 @@ namespace Easy.Modules.MutiLanguage
                 translate.LanValue = entity.LanValue;
                 return Update(translate);
             }
+        }
+
+        public IEnumerable<LanguageEntity> Get(Expression<Func<LanguageEntity, bool>> expression, Pagination pagination)
+        {
+            var allLanguage = GetAllFromLocaleFile();
+
+            if (pagination.OrderBy.IsNotNullAndWhiteSpace())
+            {
+                allLanguage = allLanguage.OrderBy(GetPropertyDelegate(pagination.OrderBy));
+            }
+            else if (pagination.OrderByDescending.IsNotNullAndWhiteSpace())
+            {
+                allLanguage = allLanguage.OrderByDescending(GetPropertyDelegate(pagination.OrderByDescending));
+            }
+
+            if (pagination.ThenBy.IsNotNullAndWhiteSpace())
+            {
+                allLanguage = (allLanguage as IOrderedEnumerable<LanguageEntity>).ThenBy(GetPropertyDelegate(pagination.ThenBy));
+            }
+            else if (pagination.ThenByDescending.IsNotNullAndWhiteSpace())
+            {
+                allLanguage = (allLanguage as IOrderedEnumerable<LanguageEntity>).ThenByDescending(GetPropertyDelegate(pagination.ThenByDescending));
+            }
+            if (expression != null)
+            {
+                allLanguage = allLanguage.Where(expression.CompileFast()).ToList();
+            }
+            pagination.RecordCount = allLanguage.Count();
+            return allLanguage.Skip(pagination.PageIndex * pagination.PageSize).Take(pagination.PageSize);
+        }
+
+        private Func<LanguageEntity, object> GetPropertyDelegate(string propertyName)
+        {
+            Type type = typeof(LanguageEntity);
+
+            var objPara = Expression.Parameter(type, "m");
+            Expression expProperty = Expression.Property(objPara, propertyName);
+            Expression propertyToObject = Expression.Convert(expProperty, typeof(object));
+            var propertyDelegateExpression = Expression.Lambda(propertyToObject, objPara);
+            return (Func<LanguageEntity, object>)propertyDelegateExpression.CompileFast();
+        }
+
+        public string[] GetCultureCodes()
+        {
+            return Directory.GetFiles(GetLocaleDirectory(), "*.yml").Select(m => Path.GetFileNameWithoutExtension(m)).ToArray();
         }
     }
 }

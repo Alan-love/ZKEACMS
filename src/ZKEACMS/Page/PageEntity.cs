@@ -12,6 +12,7 @@ using ZKEACMS.ExtendField;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.ComponentModel.DataAnnotations;
 using Easy.RepositoryPattern;
+using Easy.AuditTrail.Attributes;
 
 namespace ZKEACMS.Page
 {
@@ -50,33 +51,22 @@ namespace ZKEACMS.Page
         public string Content { get; set; }
         public string MetaKeyWorlds { get; set; }
         public string MetaDescription { get; set; }
+        
+        [AuditIgnore]
         public string Script { get; set; }
+
+        [AuditIgnore]
         public string Style { get; set; }
+
+        [AuditIgnore]
         public bool IsHomePage { get; set; }
 
         public DateTime? PublishDate { get; set; }
         public bool IsPublish { get; set; }
         [NotMapped]
-        public string Favicon { get; set; }
-        [NotMapped]
         public List<PageAsset> Styles { get; set; }
         [NotMapped]
         public List<PageAsset> Scripts { get; set; }
-        public void ConfigSEO(string title,string keywords,string description)
-        {
-            if (title.IsNotNullAndWhiteSpace())
-            {
-                Title = title;
-            }
-            if (keywords.IsNotNullAndWhiteSpace())
-            {
-                MetaKeyWorlds = keywords;
-            }
-            if (description.IsNotNullAndWhiteSpace())
-            {
-                MetaDescription = description;
-            }
-        }
     }
     class PageMetaData : ViewMetaData<PageEntity>
     {
@@ -92,7 +82,7 @@ namespace ZKEACMS.Page
             ViewConfig(m => m.Style).AsHidden();
             ViewConfig(m => m.Scripts).AsListEditor().Sortable();
             ViewConfig(m => m.Styles).AsListEditor().Sortable();
-            
+
             ViewConfig(m => m.ParentId).AsHidden();
             ViewConfig(m => m.ID).AsHidden();
             ViewConfig(m => m.DisplayOrder).AsHidden();
@@ -102,7 +92,6 @@ namespace ZKEACMS.Page
             ViewConfig(m => m.PublishDate).AsTextBox().Hide();
             ViewConfig(m => m.IsPublish).AsTextBox().Hide();
             ViewConfig(m => m.IsPublishedPage).AsTextBox().Hide();
-            ViewConfig(m => m.Favicon).AsHidden().Ignore();
         }
     }
 

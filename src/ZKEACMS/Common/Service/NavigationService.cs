@@ -11,24 +11,60 @@ using System.Linq.Expressions;
 using ZKEACMS.Common.Models;
 using Easy;
 using Microsoft.EntityFrameworkCore;
+using ZKEACMS.Safety;
+using Easy.AuditTrail;
 
 namespace ZKEACMS.Common.Service
 {
     public class NavigationService : ServiceBase<NavigationEntity, CMSDbContext>, INavigationService
     {
-        public NavigationService(IApplicationContext applicationContext, CMSDbContext dbContext) : base(applicationContext, dbContext)
+        private readonly IHtmlSanitizer _htmlSanitizer;
+        private readonly IAuditTrailService _auditTrailService;
+        public NavigationService(IApplicationContext applicationContext,
+            CMSDbContext dbContext,
+            IHtmlSanitizer htmlSanitizer,
+            IAuditTrailService auditTrailService) : base(applicationContext, dbContext)
         {
+            _htmlSanitizer = htmlSanitizer;
+            _auditTrailService = auditTrailService;
         }
         public override DbSet<NavigationEntity> CurrentDbSet => DbContext.Navigation;
-        public override ServiceResult<NavigationEntity> Add(NavigationEntity item)
+        public override ErrorOr<NavigationEntity> Add(NavigationEntity item)
         {
             if (item.ParentId.IsNullOrEmpty())
             {
                 item.ParentId = "#";
             }
             item.ID = Guid.NewGuid().ToString("N");
+            Santize(item);
             return base.Add(item);
         }
+
+        public override ErrorOr<NavigationEntity> AddRange(params NavigationEntity[] items)
+        {
+            foreach (var item in items)
+            {
+                Santize(item);
+            }
+            return base.AddRange(items);
+        }
+
+        public override ErrorOr<NavigationEntity> Update(NavigationEntity item)
+        {
+            Santize(item);
+            _auditTrailService.AuditUpdate(Get(item.ID), item);
+            return base.Update(item);
+        }
+
+        public override ErrorOr<NavigationEntity> UpdateRange(params NavigationEntity[] items)
+        {
+            foreach (var item in items)
+            {
+                Santize(item);
+            }
+            return base.UpdateRange(items);
+        }
+
         public override void Remove(NavigationEntity item)
         {
             Remove(m => m.ParentId == item.ID);
@@ -52,26 +88,29 @@ namespace ZKEACMS.Common.Service
             base.Remove(filter);
         }
 
-        public void Move(string id, string parentId, int position, int oldPosition)
+        public void Move(string id, string parentId, int position)
         {
             var nav = Get(id);
             nav.ParentId = parentId;
-            nav.DisplayOrder = position;
+            var siblings = Get().Where(m => m.ParentId == nav.ParentId && m.ID != nav.ID).OrderBy(m => m.DisplayOrder).ToList();
+            siblings.Insert(position, nav);
 
-            IEnumerable<NavigationEntity> navs = CurrentDbSet.AsTracking().Where(m => m.ParentId == nav.ParentId && m.ID != nav.ID).OrderBy(m => m.DisplayOrder);
-
-            int order = 1;
-            for (int i = 0; i < navs.Count(); i++)
+            for (int i = 0; i < siblings.Count; i++)
             {
-                var eleNav = navs.ElementAt(i);
-                if (i == position - 1)
-                {
-                    order++;
-                }
-                eleNav.DisplayOrder = order;
-                order++;
+                siblings[i].DisplayOrder = i + 1;
             }
-            Update(nav);
+            var ids = siblings.Select(m => m.ID).ToArray();
+            foreach (var item in Get(m => ids.Contains(m.ID)))
+            {
+                _auditTrailService.AuditUpdate(item, siblings.First(m => m.ID == item.ID));
+            }
+            UpdateRange(siblings.ToArray());
+        }
+
+        private void Santize(NavigationEntity item)
+        {
+            item.Title = _htmlSanitizer.Sanitize(item.Title);
+            item.Html = _htmlSanitizer.Sanitize(item.Html);
         }
     }
 }

@@ -19,8 +19,10 @@
                 @if (Authorizer.Authorize(PermissionKeys.ManageUser))
                 {
                     <input type="submit" class="btn btn-primary" value="@L("Save")" data-value="@ActionType.Create" />
+                    <input type="submit" class="btn btn-primary" value="@L("Save And Exit")" data-value="@(ActionType.UpdateAndExit)" />
                 }
-                <input type="button" class="btn btn-default cancel" value="@L("Cancel")" />
+                @Html.ChangeHistoryBtn(Model)
+                <a class="btn btn-default" href="@Url.Action("Index")">@L("Cancel")</a>
             </div>
         </form>
     </div>

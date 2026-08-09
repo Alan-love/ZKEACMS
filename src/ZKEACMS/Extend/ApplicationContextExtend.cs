@@ -14,11 +14,15 @@ namespace ZKEACMS
     {
         public static T GetService<T>(this IApplicationContext applicationContext)
         {
-            return applicationContext.As<CMSApplicationContext>().HttpContextAccessor.HttpContext.RequestServices.GetService<T>();
+            return applicationContext.Current().HttpContextAccessor.HttpContext.RequestServices.GetService<T>();
         }
         public static IEnumerable<T> GetServices<T>(this IApplicationContext applicationContext)
         {
-            return applicationContext.As<CMSApplicationContext>().HttpContextAccessor.HttpContext.RequestServices.GetServices<T>();
+            return applicationContext.Current().HttpContextAccessor.HttpContext.RequestServices.GetServices<T>();
+        }
+        public static CMSApplicationContext Current(this IApplicationContext applicationContext)
+        {
+            return applicationContext.As<CMSApplicationContext>();
         }
     }
 }
